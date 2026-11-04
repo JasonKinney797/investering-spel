@@ -61,6 +61,6 @@ Open the page in two browser tabs (or on your phone, using your PC's IP address)
 **Put it online (free, Render.com)**
 1. Sign in at render.com with GitHub → **New** → **Blueprint** → choose this repo. `render.yaml` sets everything up.
 2. After the deploy you get an address like `https://investering-spel.onrender.com`. The whole game (solo and online) works there directly.
-3. Optional, so online mode also works from GitHub Pages: in `online.js`, set `SERVER_URL = "wss://investering-spel.onrender.com/ws"`.
+3. The online page on GitHub Pages connects to this Render server automatically (`SERVER_URL` in `online.js`).
 
 The free Render plan sleeps after 15 minutes without players. The first visit after that takes up to a minute to wake it.
