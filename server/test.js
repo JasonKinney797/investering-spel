@@ -16,7 +16,8 @@ function client(name) {
     const m = JSON.parse(raw);
     if (m.t === "state") c.state = m.room;
     if (m.t === "joined") c.token = m.token;
-    if (m.t === "error") c.errors.push(m.text);
+    if (m.t === "error") c.errors.push(m.key);
+    if (m.t === "notice") (c.notices = c.notices || []).push(m.kind);
     c.waiters = c.waiters.filter(w => !w(m));
   });
   c.send = obj => ws.send(JSON.stringify(obj));
@@ -46,10 +47,10 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   x.send({ t: "join", code: "ZZZZ", name: "Xavi" });
   await a.until(s => s.players.length === 2);
   await sleep(100);
-  assert.ok(x.errors.some(e => /bestaat niet/.test(e)), "bad code rejected");
+  assert.ok(x.errors.includes("err.noRoom"), "bad code rejected");
   b.send({ t: "start" });
   await sleep(100);
-  assert.ok(b.errors.some(e => /host/.test(e)), "only host can start");
+  assert.ok(b.errors.includes("err.hostOnly"), "only host can start");
   a.send({ t: "settings", settings: { speed: "calm", target: "nonsense" } });
   await a.until(s => s.settings.speed === "calm" && s.settings.target === "1m");
   a.send({ t: "start" });
@@ -61,7 +62,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await b.until(s => s.stocks.find(x => x.name === "EuroBank").ownerId === s.players.find(p => p.name === "Anna").id);
   b.send({ t: "buy", stock: "EuroBank", qty: 120 });
   const s1 = await a.until(s => s.stocks.find(x => x.name === "EuroBank").ownerId === s.players.find(p => p.name === "Bram").id);
-  assert.ok(s1.news.some(n => /neemt EuroBank over/.test(n.text)), "takeover news");
+  assert.ok(s1.news.some(n => n.parts[0][0] === "news.takeoverPlayer" && n.parts[0][1].company === "EuroBank"), "takeover news");
+  assert.strictEqual(s1.stocks.length, 10, "10 companies online");
   assert.strictEqual(s1.stocks.find(x => x.name === "EuroBank").ceo.name, "Bram", "Bram is CEO at 100+");
 
   // Validation: no cheating
@@ -128,6 +130,31 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   assert.strictEqual(sb.me.holdings.EuroBank, 120, "holdings kept after rejoin");
   b2.send({ t: "rejoin", token: "fake-token" });
 
+  // Deals: offer → notice → accept swaps assets atomically; invalid offers rejected
+  step = "Deals";
+  const bId = a.state.players.find(p => p.name === "Bram").id;
+  const aId = a.state.me.id;
+  a.send({ t: "deal_offer", to: aId, give: { cash: 10 }, want: {} });               // to yourself
+  a.send({ t: "deal_offer", to: bId, give: {}, want: {} });                         // empty
+  a.send({ t: "deal_offer", to: bId, give: { stock: "SpaceY", qty: 5 }, want: {} }); // shares you don't have
+  a.send({ t: "deal_offer", to: bId, give: { cash: -5 }, want: { cash: 1 } });      // negative
+  await sleep(200);
+  ["err.dealPlayer", "err.dealEmpty", "err.dealYouLack", "err.dealInvalid"].forEach(k => assert.ok(a.errors.includes(k), "deal error " + k));
+  const aCash0 = a.state.me.cash;
+  a.send({ t: "deal_offer", to: bId, give: { cash: 5000 }, want: { stock: "EuroBank", qty: 10 } });
+  const sDeal = await b2.until(s => s.deals.length === 1);
+  await sleep(100);
+  assert.ok((b2.notices || []).includes("dealOffer"), "receiver notified");
+  assert.strictEqual(x.state && x.state.deals ? x.state.deals.length : 0, 0, "deals are private");
+  b2.send({ t: "deal_accept", id: sDeal.deals[0].id });
+  const sAfter = await a.until(s => s.deals.length === 0 && (s.me.holdings.EuroBank || 0) === 70);
+  assert.ok(Math.abs(sAfter.me.cash - (aCash0 - 5000)) < 0.01, "cash moved");
+  await b2.until(s => s.me.holdings.EuroBank === 110);
+  assert.ok(sAfter.news.some(n => n.parts[0][0] === "news.deal"), "deal news");
+  a.send({ t: "deal_accept", id: 999 });
+  await sleep(100);
+  assert.ok(a.errors.includes("err.dealGone"), "unknown deal rejected");
+
   // Chat is sanitized and rate limited
   step = 'Chat is sanitized and rate limited';
   a.send({ t: "chat", text: "hoi <b>allemaal</b>" }); a.send({ t: "chat", text: "spam" });
@@ -157,6 +184,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   }
   assert.strictEqual(room.phase, "ended", "game ends (day limit 50)");
   assert.ok(room.winnerId, "winner chosen");
+  const endView = engine.viewFor(room, anna.id, Date.now());
+  assert.ok(endView.worth && endView.worth[anna.id].length > 40, "net worth history for the end chart");
+  assert.ok(Array.isArray(endView.end) && endView.end[0].startsWith("end."), "end reason is a translation key");
 
   // AFK players count as skipping
   step = 'AFK players count as skipping';
@@ -166,16 +196,31 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   r2.players.p2.lastActiveDay = -10; // AFK
   r2.players.p1.skip = true;
   assert.ok(engine.tick(r2, Date.now()), "AFK player does not block skipping");
+  // Everyone on auto-skip for days (no other clicks) keeps skipping
+  r2.players.p1.skip = false; r2.players.p1.autoSkip = true; r2.players.p2.autoSkip = true;
+  r2.players.p1.lastActiveDay = r2.players.p2.lastActiveDay = -50;
+  const dayBefore = r2.day;
+  for (let i = 0; i < 10; i++) engine.tick(r2, Date.now());
+  assert.strictEqual(r2.day, dayBefore + 10, "auto-skip players keep the game moving");
+  // Everyone idle without skip: wait for the timer instead of racing ahead
+  r2.players.p1.autoSkip = r2.players.p2.autoSkip = false; r2.players.p1.skip = r2.players.p2.skip = false;
+  const idleDay = r2.day;
+  engine.tick(r2, Date.now());
+  assert.strictEqual(r2.day, idleDay, "idle room does not fast-forward");
 
   // Static files are served, other paths are not
   step = 'Static files are served, other paths are not';
   const get = p => new Promise(res => require("http").get(`http://localhost:${process.env.PORT}${p}`, r => { r.resume(); res(r.statusCode); }));
   assert.strictEqual(await get("/online.html"), 200);
+  assert.strictEqual(await get("/lang/fr.js"), 200);
+  assert.strictEqual(await get("/assets/sounds/buy.mp3"), 200);
+  assert.strictEqual(await get("/companies.js"), 200);
+  assert.strictEqual(await get("/lang/../server/engine.js"), 404);
   assert.strictEqual(await get("/server/engine.js"), 404);
   assert.strictEqual(await get("/../package.json"), 404);
   assert.strictEqual(await get("/health"), 200);
 
-  console.log("✓ Alle servertests geslaagd");
+  console.log("✓ All server tests passed");
   [a, x, b2].forEach(c => c.ws.close());
   process.exit(0);
-})().catch(e => { console.error("✗ Test mislukt:", e); process.exit(1); });
+})().catch(e => { console.error("✗ Test failed:", e); process.exit(1); });

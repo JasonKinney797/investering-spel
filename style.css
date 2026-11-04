@@ -349,3 +349,46 @@ select.input { padding: 7px 10px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ── Start menu ─────────────────────────────────────────────────────────── */
+[hidden] { display: none !important; }
+.brand-btn { background: none; border: none; padding: 0; font: inherit; font-weight: 700; cursor: pointer; text-align: left; }
+.modal.menu { width: min(440px, calc(100vw - 28px)); }
+.menu-head { text-align: center; margin-bottom: 14px; }
+.menu-logo { font-size: 34px; color: var(--accent); line-height: 1; }
+.menu-head h2 { margin: 6px 0 4px; font-size: 22px; }
+.menu-buttons { gap: 8px; }
+.menu-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; text-decoration: none;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px;
+  font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; min-height: 56px;
+}
+.menu-btn span { font-size: 11px; font-weight: 400; color: var(--muted); }
+.menu-btn.primary { background: #7c3aed33; border-color: #7c3aed99; }
+.menu-foot { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+.menu-foot .lang-select { flex: 1; }
+@media (hover: hover) { .menu-btn:hover { border-color: #7c3aed99; } }
+
+/* ── Tutorial ───────────────────────────────────────────────────────────── */
+.tutorial {
+  position: fixed; z-index: 850; left: 50%; transform: translateX(-50%);
+  bottom: calc(16px + var(--bar-h) + var(--safe-b)); width: min(460px, calc(100vw - 24px));
+  background: #13103a; border: 1px solid #a78bfa; border-radius: 14px; padding: 14px 16px;
+  box-shadow: 0 10px 40px #000c; animation: slideUp 0.25s ease;
+}
+.tutorial h3 { margin: 2px 0 6px; font-size: 16px; }
+.tutorial p { margin: 0 0 10px; font-size: 13px; color: var(--text-2); line-height: 1.5; }
+.tut-top { display: flex; justify-content: space-between; align-items: center; }
+.tut-wait { font-size: 12px; color: var(--accent-2); animation: pulse 1.6s ease infinite; }
+.tut-target { outline: 3px solid #a78bfa; outline-offset: 3px; border-radius: 10px; animation: glow 1.6s ease infinite; position: relative; z-index: 1; }
+@keyframes glow { 50% { outline-color: #a78bfa55; } }
+@keyframes pulse { 50% { opacity: 0.5; } }
+@media (min-width: 900px) { .tutorial { bottom: 24px; } }
+
+/* ── Market filters, alerts ─────────────────────────────────────────────── */
+.chips.filter { margin-bottom: 12px; }
+.chips.filter .chip { font-size: 11px; padding: 6px 12px; }
+.bell { position: relative; padding: 6px 10px; }
+.bell .count { position: absolute; top: -6px; right: -6px; background: var(--bad); color: #fff; border-radius: 99px; font-size: 10px; min-width: 18px; height: 18px; display: grid; place-items: center; padding: 0 4px; }
+.lang-select { min-width: 0; }
+.foot a { color: #7c8db5; }

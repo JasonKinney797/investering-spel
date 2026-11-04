@@ -1,4 +1,4 @@
-# Investeer Simulator
+# Investor Simulator
 
 ## ▶ Play
 
@@ -9,8 +9,14 @@ A browser game about stocks and running companies. Buy shares, take control of c
 
 Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `index.html` in a browser, or host it on GitHub Pages.
 
+🌍 **Languages:** English (default), Nederlands, Français, Español, Deutsch, Português. The game picks your browser's language automatically; change it in the menu or settings.
+
 ## Features
 
+- **Start menu**: Play, Tutorial, or Online, plus a language picker and a sound toggle.
+- **Tutorial**: an 11-step guided tour in a calm practice market (buy, become owner, dividend, next day, company actions, alerts, rivals).
+- **10 companies in 10 sectors**: TechNova, GreenVolt, EuroBank, MedFuture, SpaceY, PixelForge (gaming), FreshMart (retail), SkyLine Air (transport), BuildCo (construction), StreamWave (media). Filter the market by sector or "Mine".
+- **Price alerts**: tap 🔔 on a stock to get notified when it goes above or below a price.
 - **Saving**: autosaves in the browser, plus export and import of a save file.
 - **Rivals (AI investors)**: three rivals trade every day. From day 20, Victor Vale can buy up shares of your companies in a hostile takeover. Buy more shares to fight back.
 - **Short selling**: earn money when a price falls. Requires 50% collateral, costs 0.1% per day, and closes automatically on a margin call.
@@ -22,7 +28,7 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - **Large charts**: click a stock for its price history, with your buys, sells and average buy price marked.
 - **Difficulty levels**: Easy, Normal, Hardcore (going bankrupt deletes your save).
 - **Daily goals**: a new goal every day for extra XP.
-- **Sound and confetti**: WebAudio sound effects (can be turned off) and animations.
+- **Sound and confetti**: real sound effects (Kenney, CC0, in `assets/sounds/`), can be turned off. Confetti for achievements.
 
 ## Controls
 
@@ -48,8 +54,13 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - Dividends are shared among all shareholders, in proportion to how many shares each holds. The owner sets the percentage.
 - Big orders move the price for everyone. Fees plus price impact mean buying and selling straight away always loses money.
 - Days run on a timer (calm 20 s, normal 10 s, turbo 4 s). If everyone presses ⏩ Skip, the next day starts at once. 🔁 Auto keeps skip switched on.
-- Nobody can stall the game: players inactive for 3 days count as skipping, and each player has 2 pauses of 30 seconds.
+- Nobody can stall the game: players inactive for 3 days count as skipping (as long as someone else wants to skip), and each player has 2 pauses of 30 seconds.
 - A news choice that isn't answered before the next day gets the safe option automatically.
+- **Deals 🤝**: offer another player shares and/or cash in exchange for their shares and/or cash. They have 3 days to accept; both sides are checked again at the moment of accepting.
+- **Notifications**: red badges on Chat and Deals plus a sound. You can turn them off, and optionally get phone/computer notifications while the tab is in the background.
+- **Price alerts** work online too (stored in your own browser).
+- **End screen chart**: everyone's net worth over the whole game.
+- Every player sees the game, news and errors in their own language.
 - If your connection drops, you stay in the game. Reload the page or open the room link to continue.
 - The first player to reach the target wins, or the richest player after the last day.
 
@@ -67,3 +78,11 @@ Open the page in two browser tabs (or on your phone, using your PC's IP address)
 3. The online page on GitHub Pages connects to this Render server automatically (`SERVER_URL` in `online.js`).
 
 The free Render plan sleeps after 15 minutes without players. The first visit after that takes up to a minute to wake it.
+
+## Translations
+
+All text lives in `lang/*.js` (one file per language, same keys as `lang/en.js`). To add a language: copy `lang/en.js`, translate the values (keep `{placeholders}` as they are), add it to `LANGS` in `i18n.js`, and add a `<script>` line in `index.html` and `online.html`.
+
+## Credits
+
+Sound effects: [Kenney](https://kenney.nl) (CC0) — see `assets/sounds/LICENSE.txt`.

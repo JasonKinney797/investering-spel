@@ -1,0 +1,5 @@
+Sound effects by Kenney (www.kenney.nl)
+Packs: Interface Sounds, Casino Audio, Short Jingles
+License: Creative Commons Zero (CC0) — http://creativecommons.org/publicdomain/zero/1.0/
+Free for personal and commercial use. Credit is not required but appreciated.
+Files were trimmed, level-matched and converted to MP3 for this game.
