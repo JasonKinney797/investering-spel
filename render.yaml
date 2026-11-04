@@ -1,0 +1,9 @@
+# Render.com blueprint: New → Blueprint → pick this repo. Free plan.
+services:
+  - type: web
+    name: investering-spel
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
