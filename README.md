@@ -1,6 +1,9 @@
 # Investeer Simulator
 
-https://jasonkinney797.github.io/investering-spel/
+## ▶ Play
+
+- 🎮 **Solo:** https://jasonkinney797.github.io/investering-spel/
+- 🌐 **Online (2–8 players):** https://jasonkinney797.github.io/investering-spel/online.html
 
 A browser game about stocks and running companies. Buy shares, take control of companies (50 shares), become CEO (100 shares), beat your rivals and reach **€1 billion**.
 
