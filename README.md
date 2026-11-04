@@ -1,5 +1,7 @@
 # Investeer Simulator
 
+https://jasonkinney797.github.io/investering-spel/
+
 A browser game about stocks and running companies. Buy shares, take control of companies (50 shares), become CEO (100 shares), beat your rivals and reach **€1 billion**.
 
 Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `index.html` in a browser, or host it on GitHub Pages.
