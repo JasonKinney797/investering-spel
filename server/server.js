@@ -1,5 +1,5 @@
 "use strict";
-// Investeer Simulator — online game server.
+// Investor Simulator — online game server.
 // One Node.js process: serves the website (HTTP) and runs the games (WebSocket on /ws).
 // Start with:  npm install  &&  npm start   →  http://localhost:8080/online.html
 
@@ -21,8 +21,9 @@ const LOBBY_GRACE_MS = 20000;               // lobby seat is kept this long afte
 
 // ─── Static website ──────────────────────────────────────────────────────────
 
-const STATIC_FILES = new Set(["/index.html", "/online.html", "/style.css", "/online.css", "/game.js", "/online.js"]);
-const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
+// Only these paths are served (no directory traversal possible: the pattern allows no dots or slashes beyond these).
+const STATIC_PATTERN = /^\/(?:(?:index|online)\.html|(?:style|online)\.css|(?:game|online|i18n|sounds|companies)\.js|lang\/[a-z]{2}\.js|assets\/sounds\/[a-z]+\.mp3|assets\/sounds\/LICENSE\.txt)$/;
+const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mp3": "audio/mpeg", ".txt": "text/plain; charset=utf-8" };
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
@@ -31,10 +32,11 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify({ ok: true, rooms: rooms.size, players: playerCount() }));
   }
   const file = url.pathname === "/" ? "/index.html" : url.pathname;
-  if (req.method !== "GET" || !STATIC_FILES.has(file)) { res.writeHead(404); return res.end("Niet gevonden"); }
+  if (req.method !== "GET" || !STATIC_PATTERN.test(file)) { res.writeHead(404); return res.end("Not found"); }
   fs.readFile(path.join(ROOT, file), (err, data) => {
-    if (err) { res.writeHead(404); return res.end("Niet gevonden"); }
-    res.writeHead(200, { "content-type": TYPES[path.extname(file)], "cache-control": "no-cache" });
+    if (err) { res.writeHead(404); return res.end("Not found"); }
+    const ext = path.extname(file);
+    res.writeHead(200, { "content-type": TYPES[ext], "cache-control": ext === ".mp3" ? "public, max-age=86400" : "no-cache" });
     res.end(data);
   });
 });
@@ -59,6 +61,12 @@ const newToken = () => crypto.randomBytes(18).toString("base64url"); // secret, 
 function playerCount() { let n = 0; sockets.forEach(s => { n += s.size; }); return n; }
 
 function send(ws, obj) { if (ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+// Errors are translation keys: the browser shows them in the player's language.
+const sendError = (ws, key, params = {}) => send(ws, { t: "error", key, params });
+function notify(code, playerId, kind, params = {}) {
+  const set = sockets.get(code); if (!set) return;
+  set.forEach(ws => { if (ws.playerId === playerId) send(ws, { t: "notice", kind, params }); });
+}
 
 function broadcast(code) {
   const room = rooms.get(code); const set = sockets.get(code);
@@ -91,7 +99,7 @@ function detach(ws) {
     p.connected = false; p.leftAt = Date.now(); // removed after a short grace period (page reloads)
   } else {
     p.connected = false;
-    engine.addNews(room, `${p.name} heeft de verbinding verbroken.`);
+    engine.addNews(room, [["news.disconnected", { player: p.name }]]);
   }
   if (!set || set.size === 0) room.emptySince = Date.now();
   broadcast(code);
@@ -105,10 +113,10 @@ function handle(ws, msg) {
 
   switch (msg.t) {
     case "create": {
-      if (room) return send(ws, { t: "error", text: "Je zit al in een kamer." });
-      if (rooms.size >= MAX_ROOMS) return send(ws, { t: "error", text: "De server is vol. Probeer later opnieuw." });
+      if (room) return sendError(ws, "err.inRoom");
+      if (rooms.size >= MAX_ROOMS) return sendError(ws, "err.serverFull");
       const code = newCode();
-      if (!code) return send(ws, { t: "error", text: "Kon geen kamer maken." });
+      if (!code) return sendError(ws, "err.serverFull");
       const r = engine.createRoom(code, msg.settings);
       rooms.set(code, r);
       const id = newId(); const token = newToken();
@@ -118,13 +126,13 @@ function handle(ws, msg) {
       return broadcast(code);
     }
     case "join": {
-      if (room) return send(ws, { t: "error", text: "Je zit al in een kamer." });
-      const code = String(msg.code || "").toUpperCase().trim();
+      if (room) return sendError(ws, "err.inRoom");
+      const code = String(msg.code || "").toUpperCase().trim().slice(0, 8);
       const r = rooms.get(code);
-      if (!r) return send(ws, { t: "error", text: `Kamer ${code || "?"} bestaat niet.` });
+      if (!r) return sendError(ws, "err.noRoom", { code: code || "?" });
       const id = newId(); const token = newToken();
       const res = engine.addPlayer(r, id, msg.name);
-      if (res.error) return send(ws, { t: "error", text: res.error });
+      if (res.error) return sendError(ws, res.error[0], res.error[1]);
       tokens.set(token, { code, id });
       attach(ws, code, id, token);
       return broadcast(code);
@@ -133,12 +141,12 @@ function handle(ws, msg) {
       const info = tokens.get(String(msg.token || ""));
       if (!info || !rooms.has(info.code) || !rooms.get(info.code).players[info.id]) return send(ws, { t: "rejoin-failed" });
       attach(ws, info.code, info.id, msg.token);
-      engine.addNews(rooms.get(info.code), `${rooms.get(info.code).players[info.id].name} is terug.`);
+      engine.addNews(rooms.get(info.code), [["news.back", { player: rooms.get(info.code).players[info.id].name }]]);
       return broadcast(info.code);
     }
   }
 
-  if (!room) return send(ws, { t: "error", text: "Je zit niet in een kamer." });
+  if (!room) return sendError(ws, "err.notInRoom");
   const p = room.players[ws.playerId];
   if (!p) return;
 
@@ -147,7 +155,7 @@ function handle(ws, msg) {
       for (const [t, v] of tokens) if (v.code === room.code && v.id === p.id) tokens.delete(t);
       const code = room.code;
       if (room.phase === "lobby") { detach(ws); engine.removePlayer(room, p.id); broadcast(code); }
-      else { const set = sockets.get(code); if (set) set.delete(ws); ws.roomCode = null; p.connected = false; engine.addNews(room, `${p.name} heeft het spel verlaten.`); broadcast(code); }
+      else { const set = sockets.get(code); if (set) set.delete(ws); ws.roomCode = null; p.connected = false; engine.addNews(room, [["news.left", { player: p.name }]]); broadcast(code); }
       return send(ws, { t: "left" });
     }
     case "settings":
@@ -155,7 +163,7 @@ function handle(ws, msg) {
       room.settings = engine.sanitizeSettings(msg.settings, room.settings);
       return broadcast(room.code);
     case "start":
-      if (room.hostId !== p.id) return send(ws, { t: "error", text: "Alleen de host kan starten." });
+      if (room.hostId !== p.id) return sendError(ws, "err.hostOnly");
       if (room.phase !== "lobby") return;
       engine.startGame(room, Date.now());
       return broadcast(room.code);
@@ -165,14 +173,19 @@ function handle(ws, msg) {
       const now = Date.now();
       if (now - (ws.lastChat || 0) < CHAT_GAP_MS) return;
       ws.lastChat = now;
-      room.chat.push({ id: p.id, name: p.name, color: p.color, text, at: now });
+      room.chat.push({ n: ++room.chatSeq, id: p.id, name: p.name, color: p.color, text, at: now });
       if (room.chat.length > 60) room.chat.shift();
       return broadcast(room.code);
     }
     default: {
       const res = engine.handleAction(room, p, msg, Date.now());
-      if (res.error) send(ws, { t: "error", text: res.error });
+      if (res.error) sendError(ws, res.error[0], res.error[1]);
       broadcast(room.code);
+      // Tell the other player about deal activity (they get a badge + sound).
+      if (res.notify) {
+        const kind = msg.t === "deal_offer" ? "dealOffer" : msg.t === "deal_accept" ? "dealAccepted" : res.declined ? "dealDeclined" : "dealCancelled";
+        notify(room.code, res.notify, kind, { player: p.name });
+      }
     }
   }
 }
@@ -192,7 +205,7 @@ wss.on("connection", ws => {
     if (ws.bucket < 1) return;
     ws.bucket--;
     let msg; try { msg = JSON.parse(raw); } catch { return; }
-    try { handle(ws, msg); } catch (e) { console.error("handle error", e); send(ws, { t: "error", text: "Serverfout." }); }
+    try { handle(ws, msg); } catch (e) { console.error("handle error", e); sendError(ws, "err.server"); }
   });
   ws.on("close", () => detach(ws));
   ws.on("error", () => {});
@@ -230,6 +243,6 @@ setInterval(() => {
   });
 }, 30000);
 
-server.listen(PORT, () => console.log(`Investeer Simulator server op http://localhost:${PORT}  (online: /online.html)`));
+server.listen(PORT, () => console.log(`Investor Simulator server on http://localhost:${PORT}  (online: /online.html)`));
 
 module.exports = { server, rooms };

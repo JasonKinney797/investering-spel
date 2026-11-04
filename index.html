@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="nl">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#080c18">
-  <meta name="description" content="Investeer Simulator: koop aandelen, word eigenaar en CEO, en bouw een imperium van €1 miljard.">
-  <title>Investeer Simulator</title>
+  <meta name="description" content="Investor Simulator: buy shares, take over companies, become CEO and build a €1 billion empire.">
+  <title>Investor Simulator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -15,7 +15,7 @@
   <div id="app">
     <header class="topbar">
       <div class="brand">
-        <h1><span class="accent">▸</span> Investeer Simulator</h1>
+        <h1><button class="brand-btn" data-act="menu" aria-label="Menu"><span class="accent">▸</span> <span id="brand-title">Investor Simulator</span></button></h1>
         <p id="dayline"></p>
       </div>
       <div class="stats" id="stats"></div>
@@ -26,17 +26,27 @@
 
     <div class="controlbar" id="controlbar"></div>
 
-    <nav class="tabs" id="tabs" aria-label="Tabbladen"></nav>
+    <nav class="tabs" id="tabs" aria-label="Tabs"></nav>
 
     <main id="main"></main>
 
-    <footer class="foot"><a href="online.html" style="color:#7c8db5">🌐 Online spelen met vrienden</a> • 50 aandelen = eigenaar • 100 = CEO • doel: €1 miljard</footer>
+    <footer class="foot" id="foot"></footer>
   </div>
 
+  <aside id="tutorial" class="tutorial" hidden aria-live="polite"></aside>
   <div id="modal-root"></div>
   <div id="toasts" aria-live="polite"></div>
   <canvas id="confetti" aria-hidden="true"></canvas>
 
+  <script src="i18n.js"></script>
+  <script src="lang/en.js"></script>
+  <script src="lang/nl.js"></script>
+  <script src="lang/fr.js"></script>
+  <script src="lang/es.js"></script>
+  <script src="lang/de.js"></script>
+  <script src="lang/pt.js"></script>
+  <script src="companies.js"></script>
+  <script src="sounds.js"></script>
   <script src="game.js"></script>
 </body>
 </html>
