@@ -5,10 +5,9 @@
 // Server address
 // ═══════════════════════════════════════════════════════════════════════════
 // When this page is served by the game server itself (npm start, or Render), it
-// connects to the same address automatically. On GitHub Pages it needs the
-// server's address: put it here after deploying, e.g.
-//   const SERVER_URL = "wss://investering-spel.onrender.com/ws";
-const SERVER_URL = "";
+// connects to that same address. Anywhere else (GitHub Pages, or opening the
+// file directly) it uses this server:
+const SERVER_URL = "wss://investering-spel.onrender.com/ws";
 
 const SESSION_KEY = "inv-online-session";
 const NAME_KEY = "inv-online-name";
@@ -21,11 +20,10 @@ function storageDel(k) { try { localStorage.removeItem(k); } catch { /* ignore *
 function serverUrl() {
   const custom = (storageGet(SERVER_KEY) || "").trim();
   if (custom) return custom;
-  if (SERVER_URL) return SERVER_URL;
   if (/^https?:$/.test(location.protocol) && !/github\.io$/.test(location.hostname)) {
     return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
   }
-  return "";
+  return SERVER_URL;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
