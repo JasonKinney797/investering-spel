@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080c18">
+  <meta name="description" content="Investeer Simulator online: speel met 2 tot 8 vrienden op dezelfde beurs.">
+  <title>Investeer Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="online.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <h1><span class="accent">▸</span> Investeer Online</h1>
+        <p id="dayline">Speel met vrienden op dezelfde beurs</p>
+      </div>
+      <div class="stats" id="stats"></div>
+    </header>
+    <div id="conn" class="conn" hidden></div>
+    <div class="progress" id="progress"></div>
+    <section class="newsrow" id="newsrow"></section>
+    <div class="controlbar" id="controlbar" hidden></div>
+    <nav class="tabs" id="tabs" aria-label="Tabbladen"></nav>
+    <main id="main"></main>
+    <footer class="foot"><a href="index.html">← Solo spelen</a> • 50 aandelen = eigenaar • meeste aandelen wint de controle</footer>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toasts" aria-live="polite"></div>
+  <script src="online.js"></script>
+</body>
+</html>

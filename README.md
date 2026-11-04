@@ -35,3 +35,32 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - A depression has a beginning and an end. The XP is given when you survive it.
 - A takeover gives control through the buying company, not free shares.
 - Competition wars are aimed at competitors, at most once per day per company.
+
+## Online mode (2–8 players)
+
+`online.html` is the multiplayer version: everyone trades on the same market. The server (`server/`) holds the game state and checks every action, so players can't cheat from the browser console.
+
+**How it plays**
+- Whoever holds the most shares of a company (at least 50) controls it. Buy more than another player to take their company away.
+- Dividends are shared among all shareholders, in proportion to how many shares each holds. The owner sets the percentage.
+- Big orders move the price for everyone. Fees plus price impact mean buying and selling straight away always loses money.
+- Days run on a timer (calm 20 s, normal 10 s, turbo 4 s). If everyone presses ⏩ Skip, the next day starts at once. 🔁 Auto keeps skip switched on.
+- Nobody can stall the game: players inactive for 3 days count as skipping, and each player has 2 pauses of 30 seconds.
+- A news choice that isn't answered before the next day gets the safe option automatically.
+- If your connection drops, you stay in the game. Reload the page or open the room link to continue.
+- The first player to reach the target wins, or the richest player after the last day.
+
+**Run locally**
+```
+npm install
+npm start          # → http://localhost:8080/online.html
+npm test           # automated server tests
+```
+Open the page in two browser tabs (or on your phone, using your PC's IP address) to play against yourself.
+
+**Put it online (free, Render.com)**
+1. Sign in at render.com with GitHub → **New** → **Blueprint** → choose this repo. `render.yaml` sets everything up.
+2. After the deploy you get an address like `https://investering-spel.onrender.com`. The whole game (solo and online) works there directly.
+3. Optional, so online mode also works from GitHub Pages: in `online.js`, set `SERVER_URL = "wss://investering-spel.onrender.com/ws"`.
+
+The free Render plan sleeps after 15 minutes without players. The first visit after that takes up to a minute to wake it.
