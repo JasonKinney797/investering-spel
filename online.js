@@ -6,9 +6,9 @@ const { t } = I18N;
 // ═══════════════════════════════════════════════════════════════════════════
 // Server address
 // ═══════════════════════════════════════════════════════════════════════════
-// When this page is served by the game server itself (npm start, or Render), it
-// connects to that same address. Anywhere else (GitHub Pages, or opening the
-// file directly) it uses this server:
+// The online game server. Every copy of the page (GitHub Pages, itch.io, a local file)
+// connects here, except when the page is served by a game server itself:
+// on Render, or on your own computer/network while testing with `npm start`.
 const SERVER_URL = "wss://investering-spel.onrender.com/ws";
 
 const SESSION_KEY = "inv-online-session";
@@ -24,10 +24,12 @@ function storageDel(k) { try { localStorage.removeItem(k); } catch { /* ignore *
 function serverUrl() {
   const custom = (storageGet(SERVER_KEY) || "").trim();
   if (custom) return custom;
-  if (/^https?:$/.test(location.protocol) && !/github\.io$/.test(location.hostname)) {
-    return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
-  }
-  return SERVER_URL;
+  const h = location.hostname;
+  const servedByGameServer = /^https?:$/.test(location.protocol) && (
+    /\.onrender\.com$/.test(h) ||                                   // the Render deployment
+    h === "localhost" || h === "127.0.0.1" || h === "[::1]" ||       // npm start on this computer
+    /^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h));           // npm start, opened from a phone on the same Wi-Fi
+  return servedByGameServer ? `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws` : SERVER_URL;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
