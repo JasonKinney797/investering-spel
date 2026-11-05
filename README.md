@@ -79,6 +79,10 @@ Open the page in two browser tabs (or on your phone, using your PC's IP address)
 
 The free Render plan sleeps after 15 minutes without players. The first visit after that takes up to a minute to wake it.
 
+## itch.io
+
+Run `./scripts/make-itch-zip.sh` to build `dist/investor-simulator-itch.zip`, then upload it on itch.io as an **HTML** project ("This file will be played in the browser"). Online mode on itch.io connects to the Render server automatically.
+
 ## Translations
 
 All text lives in `lang/*.js` (one file per language, same keys as `lang/en.js`). To add a language: copy `lang/en.js`, translate the values (keep `{placeholders}` as they are), add it to `LANGS` in `i18n.js`, and add a `<script>` line in `index.html` and `online.html`.
