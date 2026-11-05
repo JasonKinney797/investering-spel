@@ -74,3 +74,9 @@
   .deal-form, .deal-swap { grid-template-columns: 1fr; }
   .swap-icon { transform: rotate(90deg); }
 }
+
+/* Keep the timer text inside its box on narrow phones (it used to run under the Ready button). */
+.timer { overflow: hidden; }
+.timer-top span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.timer-top span:last-child { flex: 0 0 auto; }
+@media (max-width: 420px) { .timer-top { font-size: 10px; } }
