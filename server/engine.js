@@ -559,7 +559,8 @@ function advanceDay(room) {
       // A bank is calm in normal times and falls hard in a crisis.
       if (room.recession && Math.random() < 0.10) { price *= 0.75; notes.push(["news.bankRun", {}]); }
       if (room.depression) price *= 0.97;
-      if (!room.recession && !room.depression && price < 60) price *= 1.012;
+      if (!room.recession && !room.depression && price < 60) price += (60 - price) * 0.04;
+      price = Math.max(price, 6);
     }
     if (s.name === "SpaceY" && price > 1200 && Math.random() < 0.18) { price *= 0.55; notes.push(["news.bubble", {}]); }
     if (Math.random() < 0.008 * ((100 - s.ceo.reliability) / 100)) { price *= 0.92; s.reputation = clamp(s.reputation - 8, 0, 100); notes.push(["news.scandal", { company: s.name }]); }
@@ -593,7 +594,7 @@ function advanceDay(room) {
     room.recessionDays++;
     if (room.recessionDays >= 8 && roll < 0.12) {
       room.recession = false; room.recessionDays = 0; room.depression = true; room.depressionDays = 1;
-      room.stocks.forEach(s => { if (!s.bankrupt) { s.price = round2(s.price * (s.name === "EuroBank" ? 0.3 : 0.6)); s.history[s.history.length - 1] = s.price; } });
+      room.stocks.forEach(s => { if (!s.bankrupt) { s.price = round2(s.name === "EuroBank" ? Math.max(6, s.price * 0.3) : s.price * 0.6); s.history[s.history.length - 1] = s.price; } });
       headline = ["news.depression", {}]; kind = "bad";
     } else if (room.recessionDays >= 5 && roll < 0.28) { room.recession = false; room.recessionDays = 0; headline = ["news.recovery", { event: ev.id }]; kind = "good"; }
   } else if (roll < 0.035) { room.recession = true; room.recessionDays = 1; headline = ["news.recession", { event: ev.id }]; kind = "bad"; }
