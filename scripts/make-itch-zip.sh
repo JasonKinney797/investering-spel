@@ -3,7 +3,7 @@
 # index.html ends up at the top level of the zip, as itch.io requires.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-FILES=(index.html online.html style.css online.css game.js online.js i18n.js sounds.js companies.js lang assets)
+FILES=(index.html online.html style.css online.css game.js online.js i18n.js sounds.js companies.js minigames.js lang assets)
 mkdir -p dist
 OUT="dist/investor-simulator-itch.zip"
 rm -f "$OUT"

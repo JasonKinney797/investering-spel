@@ -22,7 +22,7 @@ const LOBBY_GRACE_MS = 20000;               // lobby seat is kept this long afte
 // ─── Static website ──────────────────────────────────────────────────────────
 
 // Only these paths are served (no directory traversal possible: the pattern allows no dots or slashes beyond these).
-const STATIC_PATTERN = /^\/(?:(?:index|online)\.html|(?:style|online)\.css|(?:game|online|i18n|sounds|companies)\.js|lang\/[a-z]{2}\.js|assets\/sounds\/[a-z]+\.mp3|assets\/sounds\/LICENSE\.txt)$/;
+const STATIC_PATTERN = /^\/(?:(?:index|online)\.html|(?:style|online)\.css|(?:game|online|i18n|sounds|companies|minigames)\.js|lang\/[a-z]{2}\.js|assets\/sounds\/[a-z]+\.mp3|assets\/sounds\/LICENSE\.txt)$/;
 const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mp3": "audio/mpeg", ".txt": "text/plain; charset=utf-8" };
 
 const server = http.createServer((req, res) => {

@@ -18,7 +18,7 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - **10 companies in 10 sectors**: TechNova, GreenVolt, EuroBank, MedFuture, SpaceY, PixelForge (gaming), FreshMart (retail), SkyLine Air (transport), BuildCo (construction), StreamWave (media). Filter the market by sector or "Mine".
 - **Price alerts**: tap 🔔 on a stock to get notified when it goes above or below a price.
 - **Saving**: autosaves in the browser, plus export and import of a save file.
-- **Rivals (AI investors)**: three rivals trade every day. From day 20, Victor Vale can buy up shares of your companies in a hostile takeover. Buy more shares to fight back.
+- **Rivals (AI investors)**: three rivals trade every day. On Easy each has their own style. From Normal up they all attack: one raids your companies (hostile takeovers from day 20, day 10 on Hardcore), one shorts the stocks you hold, one snipes shares of companies you are about to control. Buy more shares to fight back.
 - **Short selling**: earn money when a price falls. Requires 50% collateral, costs 0.1% per day, and closes automatically on a margin call.
 - **Auto-play**: 1×, 2× or 5× speed, plus a pause button.
 - **News choices**: events where you decide (scandal, strike, patent, subsidy, influencer).
@@ -26,7 +26,12 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - **Sector synergies**: bonuses for owning certain combinations of companies.
 - **IPO**: from €10M in total value you can take your own company public.
 - **Large charts**: click a stock for its price history, with your buys, sells and average buy price marked.
-- **Difficulty levels**: Easy, Normal, Hardcore (going bankrupt deletes your save).
+- **Difficulty levels**: Easy, Normal, Hardcore. Hardcore starts with €0 and an intern job: you work your way up. Going bankrupt (below −€2,500 net worth) deletes your save.
+- **Jobs**: work for one of the 10 market companies. Salary is paid per working day (yearly salary ÷ 312 days, 6 days a week, Sundays off) with a little XP each day. Every 12 working days there is a review: enough XP means a promotion (7 levels, Intern → Vice President). Employees get 10% off their first 10 shares a day of their employer. Companies lay people off in a recession.
+- **10 overtime mini-games**: one per company, playable once per working day (`minigames.js`). A good score pays up to 4× your daily salary and a lot of job XP: Checkout Rush, Spot the Fake, Bug Squash, Grid Balance, Lab Mix, Launch Window, QA Tester, Trend Hunter, Gate Sort, Stack It.
+- **Side hustles**: lemonade stand, bike delivery, food truck, laundromat, rental flat. Pay once, earn every day (max 3 of each).
+- **Personal loan**: €1,000 at 1.5% interest per day, for when you are broke.
+- **EuroBank**: steady in normal times, but it crashes hard in a recession (bank runs) and collapses in a depression.
 - **Daily goals**: a new goal every day for extra XP.
 - **Sound and confetti**: real sound effects (Kenney, CC0, in `assets/sounds/`), can be turned off. Confetti for achievements.
 
