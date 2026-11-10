@@ -82,6 +82,8 @@
       else if (k === "event") out[k] = t(`event.${v}`);
       else if (k === "sector") out[k] = t(`sector.${v}`);
       else if (k === "type") out[k] = t(`war.${v}`);
+      else if (k === "level") out[k] = t(`job.level.${v}`);
+      else if (k === "hustle") out[k] = t(`hustle.${v}`);
       else if (k === "pct" && typeof v === "number") out[k] = num(v, 0);
       else if (typeof v === "number") out[k] = num(v, 0);
       else out[k] = v;

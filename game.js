@@ -45,6 +45,40 @@ const MAX_BUY_XP_PER_DAY = 10;
 const MAX_SELL_XP_PER_DAY = 5;
 const MAX_ALERTS = 20;
 
+// Job: 6 workdays a week, 52 weeks. Every 7th game day is a Sunday (no work, no salary).
+const WORKDAYS_PER_YEAR = 312;
+const JOB_SALARIES = [18000, 30000, 45000, 70000, 110000, 180000, 300000]; // per year: Intern → VP
+const JOB_XP_NEEDED = [100, 160, 240, 340, 460, 600];                       // job XP for the next level
+const JOB_MAX_LEVEL = JOB_SALARIES.length - 1;
+const JOB_DAILY_XP = 5;
+const REVIEW_WORKDAYS = 12;
+const JOB_SWITCH_DAYS = 2;
+const JOB_LAYOFF_DAYS = 3;
+const EMPLOYEE_DISCOUNT = 0.10;
+const EMPLOYEE_DISCOUNT_SHARES = 10;      // per day
+const MG_TIERS = [                       // score needed, bonus in days of salary, job XP
+  { id: "perfect", min: 0.95, pay: 4,   xp: 60 },
+  { id: "gold",    min: 0.75, pay: 2,   xp: 35 },
+  { id: "silver",  min: 0.5,  pay: 1,   xp: 20 },
+  { id: "bronze",  min: 0.25, pay: 0.5, xp: 10 },
+];
+const COMPANY_GAMES = {
+  FreshMart: "change", EuroBank: "fake", TechNova: "bugs", GreenVolt: "balance", MedFuture: "memory",
+  SpaceY: "launch", PixelForge: "diff", StreamWave: "compare", "SkyLine Air": "gates", BuildCo: "stack",
+};
+const HUSTLES = [
+  { id: "lemonade", icon: "🍋", cost: 100,   income: 8 },
+  { id: "bike",     icon: "🚲", cost: 500,   income: 35 },
+  { id: "truck",    icon: "🚚", cost: 2000,  income: 120 },
+  { id: "laundry",  icon: "🧺", cost: 8000,  income: 420 },
+  { id: "flat",     icon: "🏠", cost: 30000, income: 1300 },
+];
+const HUSTLE_MAX = 3;
+const PERSONAL_LOAN = 1000;
+const PERSONAL_LOAN_RATE = 0.015;         // per day
+const BANKRUPT_LIMIT = -2500;             // net worth below this = game over
+const EUROBANK_BASE = 60;
+
 const SPEEDS = [0, 1500, 750, 300];
 const SPEED_LABELS = ["⏸", "1×", "2×", "5×"];
 
@@ -80,16 +114,17 @@ const ACHIEVEMENTS = [
   { id: "war_started", xp: 20, icon: "⚔️" }, { id: "bankruptcy", xp: 15, icon: "💀" }, { id: "short_win", xp: 30, icon: "📉" },
   { id: "synergy", xp: 40, icon: "🔗" }, { id: "ipo", xp: 150, icon: "🔔" }, { id: "beat_rivals", xp: 80, icon: "🥇" },
   { id: "defended", xp: 40, icon: "🏰" }, { id: "goals_10", xp: 60, icon: "🎯" }, { id: "alert_hit", xp: 15, icon: "🔔" },
-  { id: "tutorial", xp: 25, icon: "🎓" }, { id: "legend_rank", xp: 0, icon: "⭐" }, { id: "hardcore_win", xp: 0, icon: "🔥" },
+  { id: "tutorial", xp: 25, icon: "🎓" },
+  { id: "promoted", xp: 30, icon: "📈" }, { id: "perfect", xp: 40, icon: "💎" }, { id: "vp", xp: 150, icon: "🕴️" }, { id: "legend_rank", xp: 0, icon: "⭐" }, { id: "hardcore_win", xp: 0, icon: "🔥" },
 ];
 
 const ACTION_COSTS = { marketing: 5000, employees: 12000, research: 20000, risk: 30000, ceo: 15000, factory: FACTORY_COST, product: 25000 };
 const WAR_COSTS = { price: 20000, ads: 15000, talent: 10000 };
 
 const RIVAL_TEMPLATES = [
-  { name: "Victor Vale",  style: "aggressive", cash: 40000, color: "#ef4444", icon: "🦈", likes: ["SpaceY", "TechNova", "PixelForge", "StreamWave"] },
-  { name: "Sophie Stern", style: "cautious",   cash: 80000, color: "#06b6d4", icon: "🦉", likes: ["EuroBank", "FreshMart", "BuildCo", "GreenVolt"] },
-  { name: "Bram Peeters", style: "trend",      cash: 25000, color: "#f59e0b", icon: "🐺", likes: [] },
+  { name: "Victor Vale",  style: "aggressive", attack: "raider",  cash: 40000, color: "#ef4444", icon: "🦈", likes: ["SpaceY", "TechNova", "PixelForge", "StreamWave"] },
+  { name: "Sophie Stern", style: "cautious",   attack: "shorter", cash: 80000, color: "#06b6d4", icon: "🦉", likes: ["EuroBank", "FreshMart", "BuildCo", "GreenVolt"] },
+  { name: "Bram Peeters", style: "trend",      attack: "sniper",  cash: 25000, color: "#f59e0b", icon: "🐺", likes: [] },
 ];
 const OLD_STYLES = { agressief: "aggressive", voorzichtig: "cautious", trendvolger: "trend" };
 const RIVAL_NORMAL_CAP = 45;
@@ -152,6 +187,7 @@ function makeStock(def) {
 }
 
 function getStartingSetup(diffKey) {
+  if (diffKey === "hardcore") return { id: "hardcore", cash: 0, ownAll: false, icon: "🔥" };
   const m = DIFFICULTIES[diffKey].cashMult;
   const r = Math.random() * 100;
   let s;
@@ -178,9 +214,12 @@ function newGame(diffKey, { persist = true, tutorial = false } = {}) {
     stocks, holdings, shorts: {}, alerts: [],
     recession: false, recessionDays: 0, depression: false, depressionDays: 0,
     xp: 0, achievements: [], milestones: [], rewarded: { own: {}, ceo: {} },
-    rivals: RIVAL_TEMPLATES.map(r => ({ name: r.name, style: r.style, color: r.color, icon: r.icon, likes: r.likes, cash: Math.round(r.cash * DIFFICULTIES[diffKey].rival), holdings: {} })),
+    // Easy keeps the calm archetypes; from Normal up every rival attacks, each in its own way.
+    rivals: RIVAL_TEMPLATES.map(r => ({ name: r.name, style: diffKey === "easy" ? r.style : r.attack, color: r.color, icon: r.icon, likes: r.likes, cash: Math.round(r.cash * DIFFICULTIES[diffKey].rival), holdings: {} })),
     news: [], lastDividend: 0, goal: null, goalsDone: 0,
-    today: { buys: 0, actions: 0, buyXp: 0, sellXp: 0 },
+    today: { buys: 0, actions: 0, buyXp: 0, sellXp: 0, emp: 0 },
+    job: null, jobGap: 0, career: { level: diffKey === "hardcore" ? 0 : 1, xp: 0, since: 0 },
+    hustles: {}, personalDebt: 0, lastSalary: 0,
     trades: [], ipoDone: false, pendingChoice: null, gameOver: false, gameWon: false,
     ownedPrev: {}, qtyPrev: {}, lostTo: {},
   };
@@ -210,11 +249,15 @@ function migrate(s) {
   D.STOCK_DEFS.forEach(def => {
     const ex = s.stocks.find(x => x.name === def.name);
     if (!ex) { s.stocks.push(makeStock(def)); return; }
-    if (!ex.recession) ex.recession = def.recession;
+    ex.recession = def.recession;
     if (!ex.sector) ex.sector = def.sector;
   });
   s.stocks.forEach(x => { if (!x.recession) x.recession = 0.978; });
   s.alerts = s.alerts || [];
+  if (!s.career) s.career = { level: 1, xp: 0, since: 0 };
+  if (s.job === undefined) s.job = null;
+  s.hustles = s.hustles || {}; s.personalDebt = s.personalDebt || 0; s.lastSalary = s.lastSalary || 0; s.jobGap = s.jobGap || 0;
+  if (s.today && s.today.emp === undefined) s.today.emp = 0;
   s.rivals.forEach(r => {
     r.style = OLD_STYLES[r.style] || r.style;
     const tpl = RIVAL_TEMPLATES.find(x => x.name === r.name);
@@ -260,7 +303,15 @@ function shortEquity(name) {
 }
 const longValue = () => state.stocks.reduce((tt, s) => tt + qtyOf(s.name) * s.price, 0);
 const shortsValue = () => Object.keys(state.shorts).reduce((tt, n) => tt + shortEquity(n), 0);
-const totalValue = () => state.cash + longValue() + shortsValue();
+const totalValue = () => state.cash + longValue() + shortsValue() - (state.personalDebt || 0);
+
+const inCrisis = () => state.recession || state.depression;
+const isSunday = () => state.day % 7 === 0;
+const salaryPerDay = (level = state.career.level) => Math.round(JOB_SALARIES[level] / WORKDAYS_PER_YEAR);
+const hustleCount = id => state.hustles[id] || 0;
+const hustleCost = h => Math.round(h.cost * Math.pow(1.5, hustleCount(h.id)));
+const sideIncome = () => HUSTLES.reduce((tt, h) => tt + hustleCount(h.id) * h.income, 0) * (inCrisis() ? 0.7 : 1);
+const canWorkToday = () => !!state.job && state.job.startsIn === 0 && !isSunday();
 
 function activeSynergies() {
   const owned = new Set(ownedNames());
@@ -368,6 +419,9 @@ function newGoal() {
     { type: "growth", target: 1.02, xp: 25 },
     { type: "short", target: 1, xp: 15 },
   ];
+  if (canWorkToday() && !state.job.played) opts.push({ type: "minigame", target: 1, xp: 20 }, { type: "minigame", target: 1, xp: 20 });
+  if (totalValue() < 1000) opts.splice(0, 3);   // broke: no trading goals you can't reach
+  if (!opts.length) opts.push({ type: "growth", target: 1.02, xp: 25 });
   if (ownedNames().length) {
     opts.push({ type: "actions", target: 2, xp: 20 });
     const est = estimatedDividend();
@@ -488,12 +542,13 @@ function advanceDay() {
   const owned = new Set(ownedNames());
   const notes = [];
   let dividend = 0;
+  const hardcoreNoDiv = state.difficulty === "hardcore" && inCrisis();   // Hardcore: no dividends during a crisis
 
   state.stocks.forEach(s => {
     if (s.bankrupt) return;
     const profit = calcProfit(s);
     if (owned.has(s.name) && profit > 0) {
-      const div = profit * s.dividendRate / 100;
+      const div = hardcoreNoDiv ? 0 : profit * s.dividendRate / 100;
       dividend += div;
       s.companyCash += profit - div;
     } else s.companyCash += profit;
@@ -511,6 +566,12 @@ function advanceDay() {
       if (Math.random() < 0.05 && s.employees > 150) { s.employees = Math.floor(s.employees * 0.96); notes.push(["news.layoffs", { company: s.name }]); }
     }
     if (state.depression) p *= 0.985;
+    if (s.name === "EuroBank") {
+      // A bank is calm in normal times and falls hard in a crisis.
+      if (state.recession && Math.random() < 0.10) { p *= 0.75; notes.push(["news.bankRun", {}]); }
+      if (state.depression) p *= 0.97;
+      if (!inCrisis() && p < EUROBANK_BASE) p *= 1.012;   // slow recovery afterwards
+    }
     if (s.name === "SpaceY") {
       if (p > 1200 && Math.random() < 0.18) { p *= 0.55; s.reputation = clamp(s.reputation - 8, 0, 100); notes.push(["news.bubble", {}]); }
       if (p > 4000 && Math.random() < 0.30) { p *= 0.30; s.reputation = clamp(s.reputation - 15, 0, 100); notes.push(["news.megaBubble", {}]); }
@@ -542,6 +603,7 @@ function advanceDay() {
 
   state.cash = round2(state.cash + dividend);
   state.lastDividend = round2(dividend);
+  dailyWork(notes, tut);
   if (!tut) rivalsAct(notes);
 
   // Economic cycle
@@ -560,7 +622,7 @@ function advanceDay() {
     state.recessionDays++;
     if (state.recessionDays >= DEPRESSION_TRIGGER_DAYS && roll < DEPRESSION_CHANCE) {
       state.depression = true; state.depressionDays = 1; state.recession = false; state.recessionDays = 0;
-      state.stocks.forEach(s => { if (!s.bankrupt) { s.price = round2(s.price * 0.6); s.history[s.history.length - 1] = s.price; } });
+      state.stocks.forEach(s => { if (!s.bankrupt) { s.price = round2(s.price * (s.name === "EuroBank" ? 0.3 : 0.6)); s.history[s.history.length - 1] = s.price; } });
       headline = ["news.depression", {}]; kind = "bad";
       sound("bad");
     } else if (state.recessionDays >= 5 && roll < RECESSION_RECOVERY_CHANCE) {
@@ -577,7 +639,7 @@ function advanceDay() {
   addNews([headline, ...notes], kind);
 
   state.day++;
-  state.today = { buys: 0, actions: 0, buyXp: 0, sellXp: 0 };
+  state.today = { buys: 0, actions: 0, buyXp: 0, sellXp: 0, emp: 0 };
   syncOwnership();
   const after = totalValue();
 
@@ -600,7 +662,7 @@ function advanceDay() {
     state.gameWon = true;
     if (state.difficulty === "hardcore") unlock("hardcore_win");
     confetti(true); sound("win");
-  } else if (after < 10) {
+  } else if (after < BANKRUPT_LIMIT) {
     state.gameOver = true; sound("bad");
   }
 
@@ -680,7 +742,9 @@ function rivalsAct(notes) {
       }
     });
     if (Math.random() > 0.55 * aggro) return;
-    if (r.style === "aggressive" && state.day > RIVAL_HOSTILE_FROM_DAY && playerOwned.length && Math.random() < 0.25 * aggro) {
+    const hostile = state.day > (state.difficulty === "hardcore" ? 10 : RIVAL_HOSTILE_FROM_DAY);
+    // Raider: buys up shares of a company you control.
+    if (hostile && (r.style === "aggressive" || r.style === "raider") && playerOwned.length && Math.random() < 0.25 * aggro) {
       const target = stockBy(pick(playerOwned));
       const pq = qtyOf(target.name);
       if (pq > 0) {
@@ -691,6 +755,28 @@ function rivalsAct(notes) {
         return;
       }
     }
+    // Short seller: attacks the price of a company you control and profits from the drop.
+    if (hostile && r.style === "shorter" && playerOwned.length && Math.random() < 0.2 * aggro) {
+      const target = stockBy(pick(playerOwned));
+      const drop = 0.03 + Math.random() * 0.03;
+      r.cash = round2(r.cash + target.price * drop * 40);
+      target.price = round2(target.price * (1 - drop));
+      target.history[target.history.length - 1] = target.price;
+      notes.push(["news.rivalShort", { rival: r.name, company: target.name, pct: Math.round(drop * 100) }]);
+      return;
+    }
+    // Sniper: when you are close to owning a company, buys more shares than you to block it.
+    if (hostile && r.style === "sniper" && Math.random() < 0.45 * aggro) {
+      const near = alive.filter(x => !isOwned(x.name) && qtyOf(x.name) >= 30);
+      if (near.length) {
+        const target = pick(near);
+        const have = r.holdings[target.name] ? r.holdings[target.name].qty : 0;
+        const want = qtyOf(target.name) + 10 - have;
+        const affordable = Math.floor(r.cash / (target.price * (1 + diff().fee)));
+        const got = want > 0 ? rivalBuy(r, target, Math.min(want, affordable)) : 0;
+        if (got) { notes.push(["news.rivalSnipes", { rival: r.name, qty: got, company: target.name, total: r.holdings[target.name].qty }]); return; }
+      }
+    }
     let s;
     if (r.style === "trend") s = alive.slice().sort((a, b) => dayChange(b) - dayChange(a))[0];
     else s = stockBy(pick(r.likes.filter(n => stockBy(n) && !stockBy(n).bankrupt)) || pick(alive).name) || pick(alive);
@@ -699,6 +785,112 @@ function rivalsAct(notes) {
     const have = r.holdings[s.name] ? r.holdings[s.name].qty : 0;
     rivalBuy(r, s, Math.min(RIVAL_NORMAL_CAP - have, Math.floor(r.cash * (0.15 + Math.random() * 0.25) / s.price)));
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Job, mini-games, side hustles, personal loan
+// ═══════════════════════════════════════════════════════════════════════════
+
+function dailyWork(notes, tut) {
+  state.lastSalary = 0;
+  const c = state.career, j = state.job;
+  if (j) {
+    const emp = stockBy(j.company);
+    if (!emp || emp.bankrupt) {
+      state.job = null; state.jobGap = JOB_LAYOFF_DAYS;
+      notes.push(["news.jobLost", { company: j.company }]);
+    } else if (j.startsIn > 0) {
+      j.startsIn--;
+    } else if (!isSunday()) {
+      const sal = salaryPerDay();
+      state.cash = round2(state.cash + sal);
+      state.lastSalary = sal;
+      c.xp += JOB_DAILY_XP; c.since++;
+      if (c.since >= REVIEW_WORKDAYS) {
+        c.since = 0;
+        if (c.level < JOB_MAX_LEVEL) {
+          const need = JOB_XP_NEEDED[c.level];
+          if (c.xp >= need) {
+            c.xp -= need; c.level++;
+            notes.push(["news.promoted", { level: c.level, amount: salaryPerDay() }]);
+            unlock("promoted");
+            if (c.level === JOB_MAX_LEVEL) unlock("vp");
+            sound("rankup");
+          } else notes.push(["news.noPromo", { xp: c.xp, need }]);
+        }
+      }
+      // Layoffs in a crisis: weaker companies fire sooner. Not if you control the company.
+      if (!tut && inCrisis() && !isOwned(j.company) && Math.random() < (emp.reputation < 50 ? 0.05 : 0.025)) {
+        state.job = null; state.jobGap = JOB_LAYOFF_DAYS;
+        notes.push(["news.laidOff", { company: j.company }]);
+        sound("bad");
+      }
+    }
+    if (state.job) state.job.played = false;
+  }
+  const side = sideIncome();
+  if (side > 0) { state.cash = round2(state.cash + side); state.lastSalary = round2(state.lastSalary + side); }
+  if (state.personalDebt > 0) state.personalDebt = round2(state.personalDebt * (1 + PERSONAL_LOAN_RATE));
+}
+
+function applyJob(company) {
+  const s = stockBy(company);
+  if (!s || s.bankrupt || !COMPANY_GAMES[company]) return;
+  if (state.job && state.job.company === company) return;
+  const gap = state.job ? JOB_SWITCH_DAYS : state.jobGap;
+  state.job = { company, startsIn: gap, played: false };
+  state.jobGap = 0;
+  addNews([["news.hired", { level: state.career.level, company }]], "good");
+  sound("goal");
+  if (ui.modal && ui.modal.type === "jobs") ui.modal = null;
+  save(); render();
+}
+
+function finishMiniGame(score) {
+  if (!state.job) { ui.modal = null; return render(); }
+  const tier = MG_TIERS.find(x => score >= x.min) || null;
+  const bonus = tier ? Math.round(salaryPerDay() * tier.pay) : 0;
+  const xp = tier ? tier.xp : 0;
+  state.cash = round2(state.cash + bonus);
+  state.career.xp += xp;
+  state.job.played = true;
+  if (tier && tier.id === "perfect") unlock("perfect");
+  if (score >= 0.5) goalProgress("minigame");
+  sound(tier ? (tier.id === "perfect" || tier.id === "gold" ? "achievement" : "goal") : "error");
+  if (tier && tier.id !== "bronze") confetti();
+  ui.modal = { type: "mgresult", tier: tier ? tier.id : "none", bonus, xp, pct: Math.round(score * 100) };
+  checkMilestones(totalValue());
+  save(); render();
+}
+
+function buyHustle(id) {
+  const h = HUSTLES.find(x => x.id === id);
+  if (!h) return;
+  if (hustleCount(id) >= HUSTLE_MAX) return msg(t("err.hustleMax"));
+  const cost = hustleCost(h);
+  if (state.cash < cost) return msg(t("err.hustleCash", { cost: fmtShort(cost) }));
+  state.cash = round2(state.cash - cost);
+  state.hustles[id] = hustleCount(id) + 1;
+  addNews([["news.hustleBought", { hustle: id, amount: h.income }]], "good");
+  sound("buy");
+  save(); render();
+}
+
+function takeLoan() {
+  if (state.personalDebt > 0) return msg(t("err.loanMax"));
+  state.cash = round2(state.cash + PERSONAL_LOAN);
+  state.personalDebt = PERSONAL_LOAN;
+  addNews([["news.loanTaken", { amount: PERSONAL_LOAN, pct: String(PERSONAL_LOAN_RATE * 100) }]]);
+  save(); render();
+}
+function repayLoan() {
+  const pay = Math.min(state.cash, state.personalDebt);
+  if (pay < 0.01) return msg(t("err.noCash"));
+  state.cash = round2(state.cash - pay);
+  state.personalDebt = round2(state.personalDebt - pay);
+  if (state.personalDebt < 0.01) state.personalDebt = 0;
+  addNews([["news.loanRepaid", { amount: pay, debt: state.personalDebt }]], "good");
+  save(); render();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -723,9 +915,12 @@ function buyStock(name) {
   if (!s || s.bankrupt) return;
   const qty = readAmount(name);
   if (!qty) return msg(t("err.amount"));
-  const cost = s.price * qty, fee = cost * feeRate();
+  // Employee perk: 10% off the first few shares of your employer each day.
+  const empQty = state.job && state.job.company === name && state.job.startsIn === 0 ? Math.max(0, Math.min(qty, EMPLOYEE_DISCOUNT_SHARES - state.today.emp)) : 0;
+  const cost = s.price * qty - s.price * empQty * EMPLOYEE_DISCOUNT, fee = cost * feeRate();
   if (state.cash < cost + fee) return msg(t("err.cash", { n: maxBuyable(s) }));
   state.cash = round2(state.cash - cost - fee);
+  state.today.emp += empQty;
   const h = state.holdings[name] || { qty: 0, avg: s.price };
   h.avg = (h.avg * h.qty + (cost + fee)) / (h.qty + qty);
   h.qty += qty;
@@ -1216,6 +1411,7 @@ function renderHeader() {
   $("newsrow").innerHTML = `
     <div class="card news ${n ? n.kind : ""}"><span class="kicker">${t("news.title")}</span><div>${n ? esc(I18N.newsText(n)) : ""}</div></div>
     ${state.lastDividend > 0 ? `<div class="card news good mini"><span class="kicker">${t("dividend")}</span><strong>+${fmtShort(state.lastDividend)}</strong></div>` : ""}
+    ${state.lastSalary > 0 ? `<div class="card news good mini"><span class="kicker">${t("job.card")}</span><strong>+${fmtShort(state.lastSalary)}</strong></div>` : ""}
     ${g && !ui.tutorial ? `<div class="card news goal ${g.done ? "done" : ""}"><span class="kicker">🎯 ${t("goal.daily")} ${g.done ? "✓" : `(+${g.xp} XP)`}</span><div>${esc(goalText(g))}${!g.done && ["buys", "actions"].includes(g.type) ? ` — ${g.progress}/${g.target}` : ""}</div></div>` : ""}`;
   $("controlbar").innerHTML = `
     <button class="next" data-act="next" ${state.gameOver || state.gameWon ? "disabled" : ""}>${t("nextDay")}</button>
@@ -1228,7 +1424,8 @@ function renderHeader() {
 function renderTabs() {
   const owned = ownedNames();
   const tabs = [["market", `📊 ${t("tab.market")}`], ["portfolio", `💼 ${t("tab.portfolio")}`],
-    ["company", `🏢 ${t("tab.companies")}${owned.length ? ` (${owned.length})` : ""}`], ["rivals", `🦈 ${t("tab.rivals")}`],
+    ["company", `🏢 ${t("tab.companies")}${owned.length ? ` (${owned.length})` : ""}`],
+    ["work", `💼 ${t("tab.work")}${(canWorkToday() && !state.job.played) || !state.job ? `<span class="tab-dot"></span>` : ""}`], ["rivals", `🦈 ${t("tab.rivals")}`],
     ["investor", `🎖️ ${t("tab.investor")}`], ["achievements", `🏅 ${t("tab.achievements")}`], ["settings", `⚙️ ${t("tab.settings")}`]];
   $("tabs").innerHTML = tabs.map(([k, l]) => {
     const dis = k === "company" && !owned.length;
@@ -1425,6 +1622,59 @@ function renderCompany() {
   </div>`;
 }
 
+function employerList() {
+  return `<div class="stack">${state.stocks.filter(s => !s.custom && !s.bankrupt && COMPANY_GAMES[s.name]).map(s => {
+    const mine = state.job && state.job.company === s.name;
+    return `<div class="row-between job-row"><div><strong>${esc(s.name)}</strong>
+      <div class="muted small-t">${sectorName(s.sector)} • ${t("job.game", { game: t(`mg.${COMPANY_GAMES[s.name]}.name`) })}</div></div>
+      ${btn(mine ? "✓" : t("job.apply"), "job-apply", { arg: s.name, color: "#22c55e", disabled: mine })}</div>`;
+  }).join("")}</div>`;
+}
+
+function renderWork() {
+  const c = state.career, j = state.job;
+  const levelName = t(`job.level.${c.level}`);
+  let jobCard;
+  if (!j) {
+    jobCard = `<div class="card span-all"><span class="label">💼 ${t("job.title")}</span>
+      <div class="mb6">${t("job.none")}</div>
+      <div class="muted small-t mb6">${t("job.startLevel", { level: levelName })} • ${t("job.salary", { amount: fmtShort(salaryPerDay()) })}${state.jobGap ? ` • ${t("job.startsIn", { n: state.jobGap })}` : ""}</div>
+      ${employerList()}</div>`;
+  } else {
+    const need = c.level < JOB_MAX_LEVEL ? JOB_XP_NEEDED[c.level] : 0;
+    const game = t(`mg.${COMPANY_GAMES[j.company]}.name`);
+    const can = canWorkToday() && !j.played;
+    jobCard = `<div class="card span-all">
+      <div class="row-between"><div><span class="label">💼 ${t("job.title")}</span>
+        <div class="rank">${esc(levelName)}</div><div class="muted">${t("job.employer")}: <b>${esc(j.company)}</b></div></div>
+        <div class="right"><div class="big-num">${t("job.salary", { amount: fmtShort(salaryPerDay()) })}</div><div class="muted small-t">${t("job.salaryYear", { amount: fmtShort(JOB_SALARIES[c.level]) })}</div></div></div>
+      ${need ? `<div class="progress-top mt8"><span>${t("job.xp", { xp: c.xp, need })}</span><span>${t("job.review", { n: REVIEW_WORKDAYS - c.since })}</span></div>
+        <div class="bar"><div style="width:${Math.min(100, c.xp / need * 100)}%;background:#22c55e"></div></div>` : `<div class="mt8" style="color:#f59e0b">${t("job.maxLevel")}</div>`}
+      ${j.startsIn > 0 ? `<div class="warn mt8">${t("job.startsIn", { n: j.startsIn })}</div>` : isSunday() ? `<div class="warn mt8">😴 ${t("job.sunday")}</div>` : ""}
+      <div class="btn-row mt12">
+        ${btn(j.played ? t("job.overtimeDone") : `🎮 ${t("job.overtime", { game })}`, "overtime", { color: "#f59e0b", cls: "lg", disabled: !can })}
+        ${btn(t("job.switch"), "jobs", { color: "#64748b" })}
+      </div>
+      <div class="muted small-t mt8">${t("job.overtimeHelp")}</div>
+      <div class="muted small-t mt4">🎁 ${t("job.perk", { n: EMPLOYEE_DISCOUNT_SHARES, company: esc(j.company) })}</div></div>`;
+  }
+  const side = sideIncome();
+  const hustles = `<div class="card span-all"><span class="label">🍋 ${t("hustle.title")}</span>
+    <div class="muted small-t mb6">${t("hustle.help")}${side ? ` <b style="color:#22c55e">${t("hustle.total", { amount: fmtShort(side) })}</b>` : ""}</div>
+    <div class="grid hustle-grid">${HUSTLES.map(h => {
+      const n = hustleCount(h.id), cost = hustleCost(h);
+      return `<div class="sub-card"><div class="row-between"><strong>${h.icon} ${t(`hustle.${h.id}`)}</strong><span class="small-t" style="color:#22c55e">${t("hustle.income", { amount: fmtShort(h.income) })}</span></div>
+        <div class="muted small-t mb6">${t("hustle.owned", { n, max: HUSTLE_MAX })}</div>
+        ${btn(n >= HUSTLE_MAX ? "✓" : t("hustle.buy", { cost: fmtShort(cost) }), "hustle-buy", { arg: h.id, color: "#84cc16", disabled: n >= HUSTLE_MAX || state.cash < cost })}</div>`;
+    }).join("")}</div></div>`;
+  const loan = `<div class="card span-all"><span class="label">💳 ${t("loan.title")}</span>
+    <div class="muted small-t mb6">${t("loan.help", { amount: fmtShort(PERSONAL_LOAN), pct: I18N.num(PERSONAL_LOAN_RATE * 100, 1), limit: fmtShort(BANKRUPT_LIMIT) })}</div>
+    <div class="row-between"><div>${state.personalDebt > 0 ? `<span style="color:#f97316">${t("loan.debt", { amount: fmtShort(state.personalDebt) })}</span>` : `<span class="muted">${t("loan.none")}</span>`}</div>
+    <div class="btn-row">${state.personalDebt > 0 ? btn(t("loan.repay", { amount: fmtShort(Math.min(state.cash, state.personalDebt)) }), "loan-repay", { color: "#14b8a6", disabled: state.cash < 0.01 })
+      : btn(t("loan.take", { amount: fmtShort(PERSONAL_LOAN) }), "loan-take", { color: "#06b6d4" })}</div></div></div>`;
+  return `<div class="grid">${jobCard}${hustles}${loan}</div>`;
+}
+
 function renderRivals() {
   const me = totalValue();
   const rows = [{ name: t("you"), icon: "🧑‍💼", color: "#a78bfa", worth: me, style: rankName(rankIndex()), me: true },
@@ -1442,7 +1692,7 @@ function renderRivals() {
           return `<div class="row-between small-t mb3"><span>${esc(n)}</span><span style="color:${threat ? "#ef4444" : "#94a3b8"}">${t("shares.n", { n: r.holdings[n].qty })}${threat ? " ⚠" : ""}</span></div>`;
         }).join("") : `<div class="muted">${t("rivals.none")}</div>`}</div></div>`;
     }).join("")}
-    <div class="card span-all muted">${t("rivals.help", { name: RIVAL_TEMPLATES[0].name, day: RIVAL_HOSTILE_FROM_DAY })}</div>
+    <div class="card span-all muted">${t(state.difficulty === "easy" ? "rivals.helpEasy" : "rivals.help", { name: RIVAL_TEMPLATES[0].name, day: state.difficulty === "hardcore" ? 10 : RIVAL_HOSTILE_FROM_DAY })}</div>
   </div>`;
 }
 
@@ -1508,7 +1758,7 @@ function render() {
   if (ae && ae.tagName === "SELECT" && main.contains(ae)) { renderTutorial(); return; }
   let focusKey = null, ss = null, se = null;
   if (ae && ae.dataset && ae.dataset.focuskey) { focusKey = ae.dataset.focuskey; try { ss = ae.selectionStart; se = ae.selectionEnd; } catch { /* ignore */ } }
-  const views = { market: renderMarket, portfolio: renderPortfolio, company: renderCompany, rivals: renderRivals, investor: renderInvestor, achievements: renderAchievements, settings: renderSettings };
+  const views = { market: renderMarket, portfolio: renderPortfolio, company: renderCompany, work: renderWork, rivals: renderRivals, investor: renderInvestor, achievements: renderAchievements, settings: renderSettings };
   main.innerHTML = (views[ui.tab] || renderMarket)();
   if (focusKey) {
     const el = document.querySelector(`[data-focuskey="${CSS.escape(focusKey)}"]`);
@@ -1526,7 +1776,7 @@ function openModal(m) { ui.modal = m; renderModal(); }
 function closeModal() {
   if (!ui.modal) return;
   if (ui.modal.type === "choice" && state && state.pendingChoice) return;
-  if (ui.modal.type === "end") return;
+  if (ui.modal.type === "end" || ui.modal.type === "minigame") return;
   if (ui.modal.type === "menu" && (ui.placeholder && !ui.tutorial)) return; // first start: pick something
   ui.modal = null; renderModal();
 }
@@ -1604,6 +1854,19 @@ function renderModal() {
       <span class="label mt8">${t("ipo.sector")}</span>
       <select class="input" data-ipo-sector>${D.SECTORS.map(k => `<option value="${k}" ${ui.ipoSector === k ? "selected" : ""}>${esc(sectorName(k))}</option>`).join("")}</select>
       <div class="btn-row mt12">${btn(t("ipo.go"), "ipo-go", { color: "#f59e0b", cls: "lg" })}</div>`;
+  } else if (m.type === "jobs") {
+    inner = `<div class="row-between"><h2>💼 ${t("job.pick")}</h2><button class="x" data-act="close" aria-label="${esc(t("close"))}">✕</button></div>
+      <p class="muted small-t">${t("job.startLevel", { level: t(`job.level.${state.career.level}`) })} • ${t("job.salary", { amount: fmtShort(salaryPerDay()) })}${state.job ? ` • ${t("job.switchNote", { n: JOB_SWITCH_DAYS })}` : ""}</p>
+      ${employerList()}`;
+  } else if (m.type === "minigame") {
+    if ($("mg-root")) return;                 // a mini-game is running: don't rebuild it
+    inner = `<div class="row-between"><span class="label">🎮 ${t("mg.title")}</span><button class="x" data-act="mg-quit" aria-label="${esc(t("mg.giveUp"))}" title="${esc(t("mg.giveUp"))}">✕</button></div><div id="mg-root"></div>`;
+    dismissable = false;
+  } else if (m.type === "mgresult") {
+    inner = `<div class="end-icon">${{ perfect: "💎", gold: "🥇", silver: "🥈", bronze: "🥉", none: "😅" }[m.tier]}</div>
+      <h2>${t(`mg.result.${m.tier}`)}</h2><p class="muted">${t("mg.score", { pct: m.pct })}</p>
+      ${m.bonus ? `<p><strong style="color:#22c55e">${t("mg.reward", { amount: fmtShort(m.bonus), xp: m.xp })}</strong></p>` : ""}
+      <div class="btn-row center mt12">${btn(t("mg.done"), "close", { color: "#a78bfa", cls: "lg" })}</div>`;
   } else if (m.type === "confirm-new") {
     inner = `<h2>${t("confirm.newTitle")}</h2><p class="muted">${t("confirm.newText", { n: state.day })}</p>
       <div class="btn-row mt12">${btn(t("confirm.yes"), "newgame-confirmed", { color: "#ef4444", cls: "lg" })}${btn(t("cancel"), "close", { color: "#64748b", cls: "lg" })}</div>`;
@@ -1614,6 +1877,7 @@ function renderModal() {
   root.innerHTML = `<div class="modal-backdrop" ${dismissable ? `data-act="close"` : ""}></div>
     <div class="modal ${m.type === "chart" ? "wide" : ""} ${m.type === "menu" ? "menu" : ""}" role="dialog" aria-modal="true">${inner}</div>`;
   if (m.type === "chart") requestAnimationFrame(() => drawChart(m.name));
+  if (m.type === "minigame") MiniGames.start(m.game, $("mg-root"), finishMiniGame);
   if (keepFocus) { const el = root.querySelector(`[data-focuskey="${keepFocus}"]`); if (el) el.focus(); }
 }
 
@@ -1708,7 +1972,14 @@ document.addEventListener("click", e => {
       if (s) { state = s; ui.placeholder = false; ui.tutorial = null; ui.modal = null; ui.selected = ownedNames()[0] || null; ui.tab = "market"; if (state.pendingChoice) ui.modal = { type: "choice" }; render(); }
       break;
     }
-    case "start": ui.modal = null; newGame(arg); render(); break;
+    case "start": newGame(arg); ui.modal = { type: "jobs" }; render(); break;
+    case "jobs": openModal({ type: "jobs" }); break;
+    case "job-apply": applyJob(arg); break;
+    case "overtime": if (canWorkToday() && !state.job.played) { setSpeed(0); openModal({ type: "minigame", game: COMPANY_GAMES[state.job.company] }); } break;
+    case "mg-quit": MiniGames.stop(); finishMiniGame(0); break;
+    case "hustle-buy": buyHustle(arg); break;
+    case "loan-take": takeLoan(); break;
+    case "loan-repay": repayLoan(); break;
     case "tutorial": ui.modal = null; newGame("easy", { tutorial: true }); render(); break;
     case "tut-next": ui.tutorial.step++; { const n = tutorialStep(); if (n && n.tab) ui.tab = n.tab; } render(); break;
     case "tut-skip": ui.tutorial = null; state = null; boot(true); break;
@@ -1749,8 +2020,8 @@ document.addEventListener("keydown", e => {
     return;
   }
   if (!state || ui.modal) return;
-  if (e.altKey && /^[1-7]$/.test(e.key)) {
-    const order = ["market", "portfolio", "company", "rivals", "investor", "achievements", "settings"];
+  if (e.altKey && /^[1-8]$/.test(e.key)) {
+    const order = ["market", "portfolio", "company", "work", "rivals", "investor", "achievements", "settings"];
     const k = order[Number(e.key) - 1];
     if (k !== "company" || ownedNames().length) { ui.tab = k; render(); }
     e.preventDefault(); return;
