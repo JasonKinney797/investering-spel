@@ -162,7 +162,6 @@ I18N.add("nl", {
   "company.noProducts": "Nog geen producten.",
   "company.synergies": "Actieve synergieën",
   "company.dividendTitle": "Dividendbeleid — nu {pct}%",
-  "company.dividendText": "Elke dag gaat {pct}% van de winst naar jouw cash. De rest blijft in het bedrijf.",
   "company.actions": "Bedrijfsacties",
   "company.interest": "Rente: {pct}%/dag (afhankelijk van CEO-betrouwbaarheid).",
   "company.inject": "Cash inleggen (jouw cash → bedrijf)",
@@ -232,7 +231,6 @@ I18N.add("nl", {
   "investor.earn": "XP verdienen",
   "investor.synergies": "Sectorsynergieën",
   "investor.dividendTitle": "Dividend uitgelegd",
-  "investor.dividendText": "Een bedrijf dat je bezit maakt elke dag winst of verlies. <b>Dividend</b> is het deel van de winst dat naar jouw cash gaat. De rest blijft in het bedrijf. Bij verlies daalt de bedrijfskas; onder {amount} gaat het bedrijf failliet.",
   "xp.list.buy": "Aankoop ≥ €500 (max 10/dag)",
   "xp.list.sell": "Verkoop met winst (max 5/dag)",
   "xp.list.own": "Bedrijf verwerven (1× per bedrijf)",
@@ -609,7 +607,7 @@ I18N.add("nl", {
   "conn.badUrl": "Ongeldig serveradres.",
   "conn.elsewhere": "Dit spel is geopend in een ander tabblad of apparaat.",
   "conn.lost": "Verbinding kwijt. Opnieuw verbinden…",
-  "conn.retry": "Geen verbinding. Opnieuw proberen over {n} s… (gratis servers kunnen tot een minuut nodig hebben om op te starten)",
+  "conn.retry": "Geen verbinding. Opnieuw proberen over {n} s… (gratis servers kunnen tot een minuut nodig hebben om op te starten)"
 });
 
 // Jobs, mini-games, side hustles, loan, rival attack styles
@@ -765,7 +763,6 @@ I18N.add("nl", {
   "tut.owner.title": "Je bent eigenaar! 🏢",
   "tut.owner.text": "Open het tabblad Bedrijven om {company} te leiden.",
   "tut.dividend.title": "Betaal jezelf uit",
-  "tut.dividend.text": "Dividend is het deel van de dagelijkse winst van het bedrijf dat naar jou gaat. Druk op 50%.",
   "tut.factory.title": "Laat het groeien 🏭",
   "tut.factory.text": "Het bedrijf heeft zijn eigen kas, los van jouw geld. Gebruik die: bouw een fabriek ({cost}). Meer inkomsten voor het bedrijf betekent meer dividend voor jou.",
   "tut.payday.title": "Haal je inkomen op",
@@ -800,13 +797,11 @@ I18N.add("nl", {
   "xp.reason.step": "eerste stap gezet",
   "glossary.title": "Wat betekent dit?",
   "glossary.share": "Aandeel",
-  "glossary.share.text": "Een klein stukje van een bedrijf. De koers verandert elke dag.",
   "glossary.profit": "Winst en verlies",
   "glossary.profit.text": "Het verschil tussen wat je betaalde en wat je aandelen nu waard zijn. Het wordt pas echt als je verkoopt.",
   "glossary.owner": "Eigenaar en CEO",
   "glossary.owner.text": "Met {n} aandelen (en meer dan elke rivaal) ben je eigenaar en beslis je wat het bedrijf doet. Met {ceo} aandelen ben je CEO.",
   "glossary.dividend": "Dividend",
-  "glossary.dividend.text": "Het deel van de dagelijkse winst van een bedrijf dat aan jou als eigenaar wordt uitbetaald. Jij kiest het percentage.",
   "glossary.companyCash": "Bedrijfskas",
   "glossary.companyCash.text": "Geld dat van het bedrijf is, niet van jou. Acties zoals fabrieken en marketing worden hieruit betaald.",
   "glossary.salary": "Loon en overuren",
@@ -823,4 +818,26 @@ I18N.add("nl", {
   "online.tax.none": "Geen",
   "online.tax.normal": "25%",
   "online.tax.high": "40%"
+});
+
+// Shares, value-based prices, AI bosses
+I18N.add("nl", {
+  "news.aiFactory": "{company} bouwt een nieuwe fabriek.",
+  "news.aiBuyback": "{company} koopt {n} eigen aandelen terug.",
+  "news.takeoverPayout": "{company} betaalt {amount} uit zijn kas aan de andere aandeelhouders na jouw overname.",
+  "news.takeoverPayoutAll": "{company} betaalt {amount} uit zijn kas aan de andere aandeelhouders na de overname.",
+  "news.relaunch": "{company} staat weer op de markt onder nieuwe eigenaars.",
+  "err.noShares": "Er zijn nog maar {n} aandelen van {company} te koop.",
+  "stock.info": "{n} aandelen • dividend {pct}%",
+  "stock.stake": "jij bezit {pct}%",
+  "company.stake": "Je hebt {qty} van de {n} aandelen ({pct}%). Dividend wordt per aandeel uitbetaald.",
+  "autopilot.on": "Automatische piloot aan",
+  "autopilot.off": "Automatische piloot uit",
+  "autopilot.help": "Op automatische piloot leidt de AI-baas dit bedrijf voor jou: hij investeert de bedrijfskas en bepaalt het dividend.",
+  "company.dividendText": "Elke dag gaat {pct}% van de winst naar de aandeelhouders, per aandeel. Jij krijgt het deel dat bij jouw aandelen hoort. De rest blijft in het bedrijf.",
+  "investor.dividendText": "Elk bedrijf maakt elke dag winst of verlies. Het <b>dividend</b> is het deel van de winst dat naar de aandeelhouders gaat, per aandeel: hoe meer aandelen je hebt, hoe meer je krijgt. De rest blijft in het bedrijf. Verliezen gaan van de bedrijfskas af; onder {amount} gaat het bedrijf failliet.",
+  "tut.dividend.text": "Dividend is het deel van de dagelijkse winst dat een bedrijf aan zijn aandeelhouders betaalt, per aandeel. Als eigenaar kies jij hoeveel. Druk op 50%.",
+  "glossary.dividend.text": "Het deel van de dagelijkse winst van een bedrijf dat aan de aandeelhouders wordt uitbetaald, per aandeel. Meer aandelen betekent een groter deel. De eigenaar kiest het percentage.",
+  "glossary.share.text": "Een klein stukje van een bedrijf. De koers volgt wat het bedrijf waard is: zijn kas en zijn winst.",
+  "tip.shares": "De koers van een aandeel volgt wat het bedrijf waard is: zijn kas en zijn winst. Elk bedrijf heeft een AI-baas die investeert, producten lanceert en concurrenten aanvalt. Volg het nieuws om te zien wie groeit."
 });

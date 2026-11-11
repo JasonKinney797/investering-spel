@@ -95,6 +95,7 @@ function makeStock(def) {
     employees: def.employees, research: def.research, factories: 0, markets: [...def.markets], recession: def.recession,
     debt: 0, companyCash: def.companyCash, dividendRate: 10, ceo: { ...def.ceo }, ceoId: null,
     ownerId: null, products: [], bankrupt: false, history: [def.price],
+    shares: D.sharesFor(def, def.employees * 2), profitAvg: def.employees * 2, lastWarDay: 0,
   };
 }
 
@@ -158,7 +159,7 @@ const isAfk = (room, p) => !p.autoSkip && room.day - p.lastActiveDay >= AFK_DAYS
 
 const econMult = room => (room.depression ? 0.6 : room.recession ? 0.78 : 1);
 function calcIncome(room, s) {
-  const base = s.employees * 4 + s.factories * FACTORY_DAILY_INCOME;
+  const base = s.employees * 4 + D.factoryIncome(s.factories);
   return base * (1 + s.markets.reduce((tt, m) => tt + MARKET_INCOME_BONUS[m], 0)) * econMult(room);
 }
 const interestRate = s => (s.ceo.reliability >= 75 ? 0.0012 : s.ceo.reliability >= 50 ? 0.002 : 0.003);
@@ -196,6 +197,14 @@ function updateOwnership(room, s) {
     const prev = room.players[s.ownerId];
     if (owner && prev) addNews(room, [["news.takeoverPlayer", { player: owner.name, company: s.name, prev: prev.name }]], "bad");
     else if (owner) addNews(room, [["news.controlPlayer", { player: owner.name, company: s.name }]], "good");
+    // Part of the company's cash goes to the other shareholders, so a takeover is not a jackpot.
+    if (owner && !s.paidOut && s.companyCash > 20000) {
+      s.paidOut = true;                       // once per company, so control cannot be flipped for repeated payouts
+      const payout = round2(s.companyCash * D.TAKEOVER_PAYOUT), rate = TAX_RATES[room.settings.tax] || 0;
+      s.companyCash = round2(s.companyCash - payout);
+      ps.forEach(p => { if (p !== owner && qty(p, s.name) > 0) p.cash = round2(p.cash + payout * qty(p, s.name) / s.shares * (1 - rate)); });
+      addNews(room, [["news.takeoverPayoutAll", { company: s.name, amount: payout }]]);
+    }
     else if (prev) addNews(room, [["news.lostPlayer", { player: prev.name, company: s.name }]], "bad");
     s.ownerId = newId;
   }
@@ -228,6 +237,8 @@ function handleAction(room, p, msg, now) {
       if (!isInt(q) || q < 1 || q > 1e7) return err("err.amount");
       const i = impact(q);
       if (msg.t === "buy") {
+        const left = s.shares - heldShares(room, s);
+        if (q > left) return err("err.noShares", { n: Math.max(0, left), company: s.name });
         const price = s.price * (1 + i / 2);
         const total = price * q * (1 + FEE);
         if (p.cash < total) return err("err.cashCost", { cost: total });
@@ -335,9 +346,10 @@ function companyAction(room, p, msg, markActive) {
       s.research = clamp(s.research + 8, 0, 100); s.price = round2(s.price * 1.03); ceoUp("innovation", 1);
       part = ["news.research", { company: s.name }]; break;
     case "factory":
-      if ((e = spend(ACTION_COSTS.factory))) return e;
+      if ((e = spend(D.factoryCost(s.factories)))) return e;
+      part = ["news.factory", { company: s.name, income: D.factoryUnit(s.factories) }];
       s.factories++; s.employees += 120; s.price = round2(s.price * 1.05); ceoUp("leadership", 1);
-      part = ["news.factory", { company: s.name, income: FACTORY_DAILY_INCOME }]; break;
+      break;
     case "risk": {
       const prof = D.RISK_PROFILES[s.name];
       if (!prof) return err("err.noRisk", { company: s.name });
@@ -542,14 +554,17 @@ function advanceDay(room) {
   room.stocks.forEach(s => {
     if (s.bankrupt) return;
     const profit = calcProfit(room, s);
-    if (s.ownerId && profit > 0) {
-      const pool = profit * s.dividendRate / 100;
-      const holders = players.filter(p => qty(p, s.name) > 0);
-      const total = holders.reduce((tt, p) => tt + qty(p, s.name), 0);
-      holders.forEach(p => { const gross = pool * qty(p, s.name) / total, tax = gross * taxRate, d = gross - tax; p.cash = round2(p.cash + d); p.lastDividend += d; p.lastTax += tax; });
-      s.companyCash += profit - pool;
-    } else s.companyCash += profit;
-    if (!s.ownerId) aiManage(s);
+    s.profitAvg = s.profitAvg * 0.85 + profit * 0.15;
+    // Dividends are paid per share. Shares that no player holds belong to the public.
+    const pool = profit > 0 ? profit * s.dividendRate / 100 : 0;
+    if (pool > 0) players.forEach(p => { if (!qty(p, s.name)) return; const gross = pool * qty(p, s.name) / s.shares, tax = gross * taxRate, d = gross - tax; p.cash = round2(p.cash + d); p.lastDividend += d; p.lastTax += tax; });
+    s.companyCash += profit - pool;
+    // The AI boss runs every company no player controls.
+    if (!s.ownerId) {
+      const held = n => players.some(p => qty(p, n) > 0);
+      D.aiBoss(s, bossContext(room, s)).forEach(part => { if (held(s.name) || (part[2] && held(part[2]))) notes.push([part[0], part[1]]); });
+    }
+    const fair = D.fairValue(s);
     s.companyCash = round2(s.companyCash);
 
     let price = s.price;
@@ -563,10 +578,11 @@ function advanceDay(room) {
       // A bank is calm in normal times and falls hard in a crisis.
       if (room.recession && Math.random() < 0.10) { price *= 0.75; notes.push(["news.bankRun", {}]); }
       if (room.depression) price *= 0.97;
-      if (!room.recession && !room.depression && price < 60) price += (60 - price) * 0.04;
+      if (!room.recession && !room.depression && price < fair) price += (fair - price) * 0.06;
       price = Math.max(price, 6);
     }
-    if (s.name === "SpaceY" && price > 1200 && Math.random() < 0.18) { price *= 0.55; notes.push(["news.bubble", {}]); }
+    price += (fair - price) * D.FAIR_PULL;                                   // the price follows what the company is worth
+    if (s.name === "SpaceY" && price > fair * 2.5 && Math.random() < 0.18) { price *= 0.55; notes.push(["news.bubble", {}]); }
     if (Math.random() < 0.008 * ((100 - s.ceo.reliability) / 100)) { price *= 0.92; s.reputation = clamp(s.reputation - 8, 0, 100); notes.push(["news.scandal", { company: s.name }]); }
 
     s.price = round2(Math.max(0, price));
@@ -623,9 +639,13 @@ function advanceDay(room) {
   checkEnd(room);
 }
 
-function aiManage(s) {
-  if (s.companyCash > 150000 && Math.random() < 0.03) { s.companyCash -= FACTORY_COST; s.factories++; s.employees += 120; }
-  else if (s.companyCash > 60000 && Math.random() < 0.04) { s.companyCash -= 20000; s.research = clamp(s.research + 5, 0, 100); }
+const WAR_COSTS = { price: 20000, ads: 15000, talent: 10000 };
+const heldShares = (room, s) => Object.values(room.players).reduce((tt, p) => tt + qty(p, s.name), 0);
+function bossContext(room, s) {
+  return { mode: "normal", crisis: room.recession || room.depression, day: room.day, others: room.stocks.filter(o => o !== s && !o.bankrupt), held: x => heldShares(room, x),
+    mult: x => (1 + x.markets.reduce((tt, m) => tt + MARKET_INCOME_BONUS[m], 0)) * econMult(room),
+    markets: D.MARKETS, marketBonus: MARKET_INCOME_BONUS, marketFail: MARKET_FAIL_CHANCE,
+    costs: { marketing: ACTION_COSTS.marketing, employees: ACTION_COSTS.employees, research: ACTION_COSTS.research, product: ACTION_COSTS.product, war: WAR_COSTS, markets: MARKET_COSTS, loan: LOAN_AMOUNT, maxDebt: MAX_DEBT } };
 }
 
 function bankrupt(room, s, notes) {
@@ -675,7 +695,7 @@ function viewFor(room, playerId, now) {
     day: room.day, dayMs: SPEEDS[room.settings.speed], dayEndsAt: room.dayEndsAt,
     pausedUntil: room.pausedUntil, pausedBy: room.pausedBy, serverNow: now,
     recession: room.recession, depression: room.depression, target: TARGETS[room.settings.target],
-    stocks: room.stocks.map(s => ({ ...s, profit: round2(calcProfit(room, s)), income: round2(calcIncome(room, s)), costs: round2(calcCosts(room, s)), interest: interestRate(s), hasRisk: !!D.RISK_PROFILES[s.name] })),
+    stocks: room.stocks.map(s => ({ ...s, factoryCost: D.factoryCost(s.factories), profit: round2(calcProfit(room, s)), income: round2(calcIncome(room, s)), costs: round2(calcCosts(room, s)), interest: interestRate(s), hasRisk: !!D.RISK_PROFILES[s.name] })),
     players, news: room.news.slice(0, 15), chat: room.chat.slice(-40),
     deals: me ? room.deals.filter(d => d.from === me.id || d.to === me.id) : [],
     worth: room.phase === "ended" ? room.worth : null,

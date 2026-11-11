@@ -172,7 +172,6 @@ I18N.add("en", {
   "company.noProducts": "No products yet.",
   "company.synergies": "Active synergies",
   "company.dividendTitle": "Dividend policy — currently {pct}%",
-  "company.dividendText": "Every day {pct}% of the profit goes to your cash. The rest stays in the company.",
   "company.actions": "Company actions",
   "company.interest": "Interest: {pct}%/day (depends on CEO reliability).",
   "company.inject": "Add cash (your cash → company)",
@@ -244,7 +243,6 @@ I18N.add("en", {
   "investor.earn": "Earning XP",
   "investor.synergies": "Sector synergies",
   "investor.dividendTitle": "How dividends work",
-  "investor.dividendText": "A company you own makes a profit or a loss every day. The <b>dividend</b> is the part of the profit that goes to your cash. The rest stays in the company. Losses reduce the company's cash; below {amount} the company goes bankrupt.",
   "xp.list.buy": "Purchase ≥ €500 (max 10/day)",
   "xp.list.sell": "Sale with profit (max 5/day)",
   "xp.list.own": "Acquire a company (once each)",
@@ -637,7 +635,7 @@ I18N.add("en", {
   "conn.badUrl": "Invalid server address.",
   "conn.elsewhere": "This game was opened in another tab or device.",
   "conn.lost": "Connection lost. Reconnecting…",
-  "conn.retry": "No connection. Trying again in {n} s… (free servers can take up to a minute to wake up)",
+  "conn.retry": "No connection. Trying again in {n} s… (free servers can take up to a minute to wake up)"
 });
 
 // Jobs, mini-games, side hustles, loan, rival attack styles
@@ -793,7 +791,6 @@ I18N.add("en", {
   "tut.owner.title": "You're the owner! 🏢",
   "tut.owner.text": "Open the Companies tab to run {company}.",
   "tut.dividend.title": "Pay yourself",
-  "tut.dividend.text": "A dividend is the part of the company's daily profit that goes to you. Press 50%.",
   "tut.factory.title": "Make it grow 🏭",
   "tut.factory.text": "The company has its own cash, separate from yours. Use it: build a factory ({cost}). More income for the company means bigger dividends for you.",
   "tut.payday.title": "Collect your income",
@@ -828,13 +825,11 @@ I18N.add("en", {
   "xp.reason.step": "first step done",
   "glossary.title": "What does this mean?",
   "glossary.share": "Share",
-  "glossary.share.text": "A small piece of a company. Its price changes every day.",
   "glossary.profit": "Profit and loss",
   "glossary.profit.text": "The difference between what you paid and what your shares are worth now. It only becomes real when you sell.",
   "glossary.owner": "Owner and CEO",
   "glossary.owner.text": "With {n} shares (and more than any rival) you own the company and decide what it does. With {ceo} shares you are its CEO.",
   "glossary.dividend": "Dividend",
-  "glossary.dividend.text": "The part of a company's daily profit that is paid to you as its owner. You choose the percentage.",
   "glossary.companyCash": "Company cash",
   "glossary.companyCash.text": "Money that belongs to the company, not to you. Company actions such as factories and marketing are paid from it.",
   "glossary.salary": "Salary and overtime",
@@ -851,4 +846,26 @@ I18N.add("en", {
   "online.tax.none": "None",
   "online.tax.normal": "25%",
   "online.tax.high": "40%"
+});
+
+// Shares, value-based prices, AI bosses
+I18N.add("en", {
+  "news.aiFactory": "{company} builds a new factory.",
+  "news.aiBuyback": "{company} buys back {n} of its own shares.",
+  "news.takeoverPayout": "{company} pays {amount} of its cash to the other shareholders after your takeover.",
+  "news.takeoverPayoutAll": "{company} pays {amount} of its cash to the other shareholders after the takeover.",
+  "news.relaunch": "{company} is back on the market under new owners.",
+  "err.noShares": "Only {n} shares of {company} are still for sale.",
+  "stock.info": "{n} shares • dividend {pct}%",
+  "stock.stake": "you own {pct}%",
+  "company.stake": "You hold {qty} of {n} shares ({pct}%). Dividends are paid per share.",
+  "autopilot.on": "Autopilot on",
+  "autopilot.off": "Autopilot off",
+  "autopilot.help": "On autopilot the AI boss runs this company for you: it invests the company's cash and sets the dividend.",
+  "company.dividendText": "Every day {pct}% of the profit is paid to the shareholders, per share. You get the part that matches your shares. The rest stays in the company.",
+  "investor.dividendText": "Every company makes a profit or a loss each day. The <b>dividend</b> is the part of the profit that is paid to the shareholders, per share: the more shares you hold, the more you get. The rest stays in the company. Losses reduce the company's cash; below {amount} the company goes bankrupt.",
+  "tut.dividend.text": "A dividend is the part of the daily profit that a company pays to its shareholders, per share. As owner you choose how much. Press 50%.",
+  "glossary.dividend.text": "The part of a company's daily profit that is paid to its shareholders, per share. More shares means a bigger part. The owner chooses the percentage.",
+  "glossary.share.text": "A small piece of a company. Its price follows what the company is worth: its cash and its profit.",
+  "tip.shares": "A share's price follows what the company is worth: its cash and its profit. Every company has an AI boss who invests, launches products and attacks competitors. Watch the news to see who is growing."
 });

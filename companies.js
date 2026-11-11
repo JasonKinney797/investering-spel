@@ -123,5 +123,131 @@
 
   const CEO_NAMES = ["Lina Storm", "Omar Van Dijk", "Victor Chen", "Aya Moreau", "Nora Steel", "Jonas Peeters", "Iris Laurent", "Karim Benali", "Sofia Lund", "Mateo Silva"];
 
-  return { MARKETS, SECTORS, STOCK_DEFS, PRODUCT_IDEAS, GENERIC_PRODUCTS, RISK_PROFILES, DEFAULT_RISK, MARKET_EVENTS, SYNERGIES, CHOICE_EVENTS, CEO_NAMES };
+  // ═══════════════════════════════════════════════════════════════════════
+  // Company economics shared by solo and online
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // A share is worth its part of the company: cash, minus debt, plus VALUE_DAYS days of profit.
+  const VALUE_DAYS = 30;
+  const FAIR_PULL = 0.04;                 // part of the gap between price and fair value that closes each day
+  const TAKEOVER_PAYOUT = 0.3;            // part of the company cash paid to all shareholders when control changes
+  const FACTORY_BASE_COST = 50000, FACTORY_BASE_INCOME = 3500, FACTORY_GROWTH = 1.1, FACTORY_FLOOR = 0.2;
+  // Every factory is bigger than the last one, but a little less efficient.
+  const factoryCost = n => Math.round(FACTORY_BASE_COST * Math.pow(FACTORY_GROWTH, n));
+  const factoryUnit = k => FACTORY_BASE_INCOME * Math.pow(FACTORY_GROWTH, k) * (FACTORY_FLOOR + (1 - FACTORY_FLOOR) * Math.pow(0.85, k));
+  function factoryIncome(n) { let sum = 0; for (let k = 0; k < n; k++) sum += factoryUnit(k); return sum; }
+
+  // Bigger companies have more shares. Chosen so the starting price equals the starting fair value.
+  function sharesFor(def, dailyProfit) {
+    if (def.shares) return def.shares;
+    const value = Math.max(0, def.companyCash) + Math.max(0, dailyProfit) * VALUE_DAYS;
+    return Math.max(200, Math.round(value / def.price / 50) * 50);
+  }
+  function fairValue(s) {
+    const value = Math.max(0, s.companyCash) - s.debt + Math.max(0, s.profitAvg || 0) * VALUE_DAYS;
+    return Math.max(1, value / s.shares);
+  }
+
+  // Easy mode: every company boss has a style. From Normal up they all simply try to win.
+  const AI_STYLES = { TechNova: "builder", GreenVolt: "builder", EuroBank: "shareholder", MedFuture: "careful", SpaceY: "gambler",
+    PixelForge: "gambler", FreshMart: "shareholder", "SkyLine Air": "careful", BuildCo: "builder", StreamWave: "gambler" };
+  const pickOne = a => a[Math.floor(Math.random() * a.length)];
+
+  // The AI boss of a company. Changes the stock and returns news parts.
+  // c: { mode, crisis, day, others, held, mult(s), costs: { marketing, employees, research, product, war: {price, ads, talent}, markets, loan, maxDebt }, marketBonus, marketFail }
+  function aiBoss(s, c) {
+    const out = [];
+    const style = c.mode === "easy" ? (AI_STYLES[s.name] || "builder") : "compete";
+    const hard = c.mode === "hardcore";
+    const chance = c.mode === "easy" ? 0.35 : hard ? 0.85 : 0.6;
+    const dailyCost = s.employees * 2.4 + s.debt * 0.003;
+    const reserve = style === "careful" ? dailyCost * 8 + 60000 : style === "gambler" ? 5000 : dailyCost * 2 + 15000;
+    const free = () => s.companyCash - reserve;
+    const mult = c.mult(s);
+    const minRoi = style === "careful" ? 0.04 : style === "shareholder" ? 0.05 : 0.012;
+
+    const options = () => {
+      const list = [];
+      const fc = factoryCost(s.factories);
+      list.push({ id: "factory", cost: fc, roi: (factoryUnit(s.factories) + 240) * mult / fc });
+      c.markets.forEach(m => { if (!s.markets.includes(m)) list.push({ id: "market", market: m, cost: c.costs.markets[m],
+        roi: (s.employees * 4 + factoryIncome(s.factories)) * c.marketBonus[m] * (1 - c.marketFail[m]) / c.costs.markets[m] }); });
+      list.push({ id: "employees", cost: c.costs.employees, roi: 200 * mult / c.costs.employees });
+      if (s.reputation < 60) list.push({ id: "marketing", cost: c.costs.marketing, roi: 0.03 });
+      if (s.research < 70) list.push({ id: "research", cost: c.costs.research, roi: 0.016 });
+      return list.sort((a, b) => b.roi - a.roi);
+    };
+    const apply = o => {
+      s.companyCash -= o.cost;
+      if (o.id === "factory") { s.factories++; s.employees += 120; s.price *= 1.03; out.push(["news.aiFactory", { company: s.name }]); }
+      else if (o.id === "market") {
+        if (Math.random() < c.marketFail[o.market]) { s.reputation = clamp(s.reputation - 10, 0, 100); s.price *= 0.95; out.push(["news.marketFail", { company: s.name, market: o.market }]); }
+        else { s.markets.push(o.market); s.reputation = clamp(s.reputation + 7, 0, 100); s.price *= 1.05; out.push(["news.marketOpen", { company: s.name, market: o.market, pct: c.marketBonus[o.market] * 100 }]); }
+      }
+      else if (o.id === "employees") s.employees += 100;
+      else if (o.id === "marketing") { s.reputation = clamp(s.reputation + 8, 0, 100); s.price *= 1.02; }
+      else if (o.id === "research") { s.research = clamp(s.research + 8, 0, 100); s.price *= 1.02; }
+    };
+
+    let best = options()[0];
+    for (let i = 0; i < (hard ? 2 : 1); i++) {
+      if (Math.random() > chance) continue;
+      if (c.crisis && free() < reserve) break;                       // sit tight in a crisis
+      const list = options();
+      best = list[0];
+      // Take the option that adds the most profit. Save up for a big one rather than nibbling at small ones.
+      const good = list.filter(o => o.roi >= minRoi).sort((x, y) => y.roi * y.cost - x.roi * x.cost);
+      const pick = good.find(o => o.cost <= free());
+      if (good.length && good[0] !== pick && free() >= good[0].cost * 0.4) continue;
+      if (pick) { apply(pick); continue; }
+      // Nothing affordable: borrow for a clearly good investment, or pay back debt with spare cash.
+      if (style === "compete" && !c.crisis && best.roi > 0.025 && s.debt + c.costs.loan <= c.costs.maxDebt * (hard ? 1 : 0.6) && best.cost <= free() + c.costs.loan && Math.random() < 0.3) {
+        s.companyCash += c.costs.loan; s.debt += c.costs.loan; apply(best);
+      } else if (s.debt > 0 && free() > 20000 && best.roi < 0.02) {
+        const pay = Math.min(s.debt, free(), 50000); s.companyCash -= pay; s.debt -= pay;
+      }
+    }
+
+    // New product: a gamble on research and reputation.
+    if (free() > c.costs.product && s.research >= (style === "gambler" ? 30 : 55) && Math.random() < (style === "gambler" ? 0.12 : style === "careful" ? 0.02 : 0.05)) {
+      s.companyCash -= c.costs.product;
+      const ok = Math.random() < clamp(0.2 + s.research / 280 + s.reputation / 450 + s.ceo.innovation / 550, 0.08, 0.85);
+      const pname = pickOne(PRODUCT_IDEAS[s.name] || GENERIC_PRODUCTS);
+      s.products.push({ name: pname, result: ok ? "Hit" : "Flop" });
+      if (s.products.length > 20) s.products.shift();
+      s.reputation = clamp(s.reputation + (ok ? 10 : -7), 0, 100);
+      s.price *= ok ? 1.12 : 0.94;
+      out.push([ok ? "news.productHit" : "news.productFlop", { company: s.name, product: pname }]);
+    }
+
+    // Price wars, ad wars and stealing talent (Normal and up).
+    if (style === "compete" && c.others.length && s.lastWarDay !== c.day && Math.random() < (hard ? 0.09 : 0.05)) {
+      const strongest = c.others.slice().sort((a, b) => b.price * b.shares - a.price * a.shares)[0];
+      const def = Math.random() < 0.6 ? strongest : pickOne(c.others);
+      const type = def.employees > s.employees && def.employees > 200 ? "talent" : s.reputation < 60 ? "ads" : "price";
+      if (free() > c.costs.war[type]) {
+        s.companyCash -= c.costs.war[type]; s.lastWarDay = c.day;
+        if (type === "price") { s.price *= 0.99; def.price *= 0.95; def.reputation = clamp(def.reputation - 2, 0, 100); }
+        else if (type === "ads") { s.price *= 1.03; s.reputation = clamp(s.reputation + 4, 0, 100); def.price *= 0.98; def.reputation = clamp(def.reputation - 4, 0, 100); }
+        else { const n = Math.min(80, def.employees); s.employees += n; def.employees -= n; s.price *= 1.02; def.price *= 0.98; }
+        def.price = round2(def.price);
+        out.push(["news.war", { company: s.name, type, target: def.name }, def.name]);
+      }
+    }
+
+    // Shareholder style: buy back own shares, which makes every remaining share worth more.
+    if (style === "shareholder" && free() > 40000 && Math.random() < 0.1) {
+      const n = Math.min(Math.floor(Math.min(free(), 60000) / s.price), s.shares - c.held(s) - 50, Math.floor(s.shares * 0.02));
+      if (n > 0) { s.companyCash -= n * s.price; s.shares -= n; out.push(["news.aiBuyback", { company: s.name, n }]); }
+    }
+
+    // Dividend policy: pay out more when there is nothing good left to invest in.
+    s.dividendRate = style === "shareholder" ? 60 : style === "careful" ? 25 : style === "gambler" ? 5 : style === "builder" ? 10
+      : c.crisis ? 0 : best.roi < 0.02 ? 50 : hard ? 15 : 20;
+    s.companyCash = round2(s.companyCash); s.price = round2(s.price);
+    return out;
+  }
+
+  return { MARKETS, SECTORS, STOCK_DEFS, PRODUCT_IDEAS, GENERIC_PRODUCTS, RISK_PROFILES, DEFAULT_RISK, MARKET_EVENTS, SYNERGIES, CHOICE_EVENTS, CEO_NAMES,
+    VALUE_DAYS, FAIR_PULL, TAKEOVER_PAYOUT, FACTORY_GROWTH, factoryCost, factoryUnit, factoryIncome, sharesFor, fairValue, aiBoss, AI_STYLES };
 });

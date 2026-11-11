@@ -162,7 +162,6 @@ I18N.add("pt", {
   "company.noProducts": "Ainda sem produtos.",
   "company.synergies": "Sinergias ativas",
   "company.dividendTitle": "Política de dividendos — agora {pct}%",
-  "company.dividendText": "Todos os dias {pct}% do lucro vai para o teu dinheiro. O resto fica na empresa.",
   "company.actions": "Ações da empresa",
   "company.interest": "Juros: {pct}%/dia (dependem da fiabilidade do CEO).",
   "company.inject": "Injetar dinheiro (o teu dinheiro → empresa)",
@@ -232,7 +231,6 @@ I18N.add("pt", {
   "investor.earn": "Ganhar XP",
   "investor.synergies": "Sinergias setoriais",
   "investor.dividendTitle": "Como funcionam os dividendos",
-  "investor.dividendText": "Uma empresa tua tem lucro ou prejuízo todos os dias. O <b>dividendo</b> é a parte do lucro que vai para o teu dinheiro. O resto fica na empresa. Os prejuízos reduzem o caixa; abaixo de {amount}, a empresa vai à falência.",
   "xp.list.buy": "Compra ≥ 500 € (máx. 10/dia)",
   "xp.list.sell": "Venda com lucro (máx. 5/dia)",
   "xp.list.own": "Adquirir uma empresa (1× cada)",
@@ -609,7 +607,7 @@ I18N.add("pt", {
   "conn.badUrl": "Endereço de servidor inválido.",
   "conn.elsewhere": "Este jogo foi aberto noutro separador ou dispositivo.",
   "conn.lost": "Ligação perdida. A voltar a ligar…",
-  "conn.retry": "Sem ligação. Nova tentativa dentro de {n} s… (os servidores gratuitos podem demorar até um minuto a arrancar)",
+  "conn.retry": "Sem ligação. Nova tentativa dentro de {n} s… (os servidores gratuitos podem demorar até um minuto a arrancar)"
 });
 
 // Jobs, mini-games, side hustles, loan, rival attack styles
@@ -765,7 +763,6 @@ I18N.add("pt", {
   "tut.owner.title": "És o dono! 🏢",
   "tut.owner.text": "Abre o separador Empresas para gerir a {company}.",
   "tut.dividend.title": "Paga a ti mesmo",
-  "tut.dividend.text": "O dividendo é a parte do lucro diário da empresa que vai para ti. Carrega em 50%.",
   "tut.factory.title": "Faz a empresa crescer 🏭",
   "tut.factory.text": "A empresa tem a sua própria caixa, separada do teu dinheiro. Usa-a: constrói uma fábrica ({cost}). Mais receitas para a empresa significam mais dividendos para ti.",
   "tut.payday.title": "Recebe o teu rendimento",
@@ -800,13 +797,11 @@ I18N.add("pt", {
   "xp.reason.step": "primeiro passo dado",
   "glossary.title": "O que significa isto?",
   "glossary.share": "Ação",
-  "glossary.share.text": "Uma pequena parte de uma empresa. O preço muda todos os dias.",
   "glossary.profit": "Lucro e prejuízo",
   "glossary.profit.text": "A diferença entre o que pagaste e o que as tuas ações valem agora. Só se torna real quando vendes.",
   "glossary.owner": "Dono e CEO",
   "glossary.owner.text": "Com {n} ações (e mais do que qualquer rival) a empresa é tua e decides o que ela faz. Com {ceo} ações és o CEO.",
   "glossary.dividend": "Dividendo",
-  "glossary.dividend.text": "A parte do lucro diário de uma empresa que te é paga como dono. Tu escolhes a percentagem.",
   "glossary.companyCash": "Caixa da empresa",
   "glossary.companyCash.text": "Dinheiro que é da empresa, não teu. Ações como fábricas e marketing são pagas com ela.",
   "glossary.salary": "Salário e horas extra",
@@ -823,4 +818,26 @@ I18N.add("pt", {
   "online.tax.none": "Nenhum",
   "online.tax.normal": "25%",
   "online.tax.high": "40%"
+});
+
+// Shares, value-based prices, AI bosses
+I18N.add("pt", {
+  "news.aiFactory": "A {company} constrói uma nova fábrica.",
+  "news.aiBuyback": "A {company} recompra {n} das suas próprias ações.",
+  "news.takeoverPayout": "A {company} paga {amount} da sua caixa aos outros acionistas depois da tua aquisição.",
+  "news.takeoverPayoutAll": "A {company} paga {amount} da sua caixa aos outros acionistas depois da aquisição.",
+  "news.relaunch": "A {company} está de volta ao mercado com novos donos.",
+  "err.noShares": "Só restam {n} ações da {company} à venda.",
+  "stock.info": "{n} ações • dividendo {pct}%",
+  "stock.stake": "tens {pct}%",
+  "company.stake": "Tens {qty} de {n} ações ({pct}%). Os dividendos são pagos por ação.",
+  "autopilot.on": "Piloto automático ligado",
+  "autopilot.off": "Piloto automático desligado",
+  "autopilot.help": "Em piloto automático, o chefe de IA gere esta empresa por ti: investe a caixa da empresa e define o dividendo.",
+  "company.dividendText": "Todos os dias, {pct}% do lucro é pago aos acionistas, por ação. Recebes a parte que corresponde às tuas ações. O resto fica na empresa.",
+  "investor.dividendText": "Cada empresa tem lucro ou prejuízo todos os dias. O <b>dividendo</b> é a parte do lucro paga aos acionistas, por ação: quanto mais ações tiveres, mais recebes. O resto fica na empresa. Os prejuízos reduzem a caixa; abaixo de {amount} a empresa vai à falência.",
+  "tut.dividend.text": "O dividendo é a parte do lucro diário que uma empresa paga aos seus acionistas, por ação. Como dono, escolhes quanto. Carrega em 50%.",
+  "glossary.dividend.text": "A parte do lucro diário de uma empresa que é paga aos acionistas, por ação. Mais ações significam uma parte maior. O dono escolhe a percentagem.",
+  "glossary.share.text": "Uma pequena parte de uma empresa. O preço segue o que a empresa vale: a sua caixa e o seu lucro.",
+  "tip.shares": "O preço de uma ação segue o que a empresa vale: a sua caixa e o seu lucro. Cada empresa tem um chefe de IA que investe, lança produtos e ataca concorrentes. Segue as notícias para ver quem está a crescer."
 });

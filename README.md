@@ -20,6 +20,9 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - **10 companies in 10 sectors**: TechNova, GreenVolt, EuroBank, MedFuture, SpaceY, PixelForge (gaming), FreshMart (retail), SkyLine Air (transport), BuildCo (construction), StreamWave (media). Filter the market by sector or "Mine".
 - **Price alerts**: tap 🔔 on a stock to get notified when it goes above or below a price.
 - **Saving**: autosaves in the browser, plus export and import of a save file.
+- **Shares and real value**: every company has a fixed number of shares (bigger companies have more). A share's price follows what the company is worth: its cash, minus debt, plus 30 days of profit. Dividends are paid per share to everyone who holds shares; shares nobody holds belong to the public.
+- **AI bosses**: every company you don't control is run by an AI boss that builds factories, opens markets, launches products, borrows, and starts price wars, ad wars and talent raids. On Easy each boss has a style (builder, careful, shareholder-friendly, gambler); from Normal up they all play to win. Your own companies can be put on **Autopilot**.
+- **Takeovers and bankruptcies**: the first time a company is taken over, 30% of its cash is paid out to the other shareholders. A bankrupt company relaunches 25 days later, smaller and under new owners. Each factory costs 10% more than the last and is a little less efficient.
 - **Rivals (AI investors)**: three rivals trade every day. On Easy each has their own style. From Normal up they all attack: one raids your companies (hostile takeovers from day 20, day 10 on Hardcore), one shorts the stocks you hold, one snipes shares of companies you are about to control. Buy more shares to fight back.
 - **Short selling**: earn money when a price falls. Requires 50% collateral, costs 0.1% per day, and closes automatically on a margin call.
 - **Auto-play**: 1×, 2× or 5× speed, plus a pause button.
