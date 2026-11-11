@@ -78,6 +78,15 @@ const PERSONAL_LOAN = 1000;
 const PERSONAL_LOAN_RATE = 0.015;         // per day
 const BANKRUPT_LIMIT = -2500;             // net worth below this = game over
 const EUROBANK_BASE = 60;
+// Taxes per difficulty. Income tax (salary, side hustles, mini-game bonuses) works in daily bands; dividends have a flat rate.
+const TAXES = {
+  easy: null,
+  normal:   { bands: [[100, 0.10], [400, 0.20], [Infinity, 0.30]], dividend: 0.25 },
+  hardcore: { bands: [[100, 0.15], [400, 0.30], [Infinity, 0.40]], dividend: 0.40 },
+};
+const FIRST_STEPS = ["job", "minigame", "profit", "own", "improve"];
+const FIRST_STEP_XP = 20;
+const GLOSSARY = ["share", "profit", "owner", "dividend", "companyCash", "salary", "tax", "recession", "short", "rivals"];
 
 const SPEEDS = [0, 1500, 750, 300];
 const SPEED_LABELS = ["⏸", "1×", "2×", "5×"];
@@ -189,7 +198,8 @@ function makeStock(def) {
 function getStartingSetup(diffKey) {
   if (diffKey === "hardcore") return { id: "hardcore", cash: 0, ownAll: false, icon: "🔥" };
   const m = DIFFICULTIES[diffKey].cashMult;
-  const r = Math.random() * 100;
+  // Straight after the tutorial you always get the standard start, never a lucky or unlucky one.
+  const r = storageGet("inv-tutorial-done") === "1" ? 50 : Math.random() * 100;
   let s;
   if (r < 12)      s = { id: "hard",        cash: 5000,     ownAll: false, icon: "💀" };
   else if (r < 24) s = { id: "dynasty",     cash: 1000000,  ownAll: true,  icon: "👑" };
@@ -203,7 +213,7 @@ function getStartingSetup(diffKey) {
 }
 
 function newGame(diffKey, { persist = true, tutorial = false } = {}) {
-  const setup = tutorial ? { id: "tutorial", cash: 20000, ownAll: false, icon: "🎓" } : getStartingSetup(diffKey);
+  const setup = tutorial ? { id: "tutorial", cash: 10000, ownAll: false, icon: "🎓" } : getStartingSetup(diffKey);
   // Dynasty: own the five original companies.
   const stocks = D.STOCK_DEFS.map(makeStock);
   const holdings = {};
@@ -219,7 +229,9 @@ function newGame(diffKey, { persist = true, tutorial = false } = {}) {
     news: [], lastDividend: 0, goal: null, goalsDone: 0,
     today: { buys: 0, actions: 0, buyXp: 0, sellXp: 0, emp: 0 },
     job: null, jobGap: 0, career: { level: diffKey === "hardcore" ? 0 : 1, xp: 0, since: 0 },
-    hustles: {}, personalDebt: 0, lastSalary: 0,
+    hustles: {}, personalDebt: 0, lastSalary: 0, incToday: 0, lastWorkTax: 0, lastDivTax: 0, ebPeak: 0,
+    tips: { seen: {}, queue: [] },
+    steps: tutorial || storageGet("inv-firststeps-done") === "1" ? null : { done: {}, flags: {} },
     trades: [], ipoDone: false, pendingChoice: null, gameOver: false, gameWon: false,
     ownedPrev: {}, qtyPrev: {}, lostTo: {},
   };
@@ -237,7 +249,13 @@ function newGame(diffKey, { persist = true, tutorial = false } = {}) {
 
   ui.tab = "market"; ui.selected = ownedNames()[0] || null; ui.amounts = {};
   ui.takeoverTarget = ""; ui.warTarget = ""; ui.flashDay = 0; ui.marketFilter = "all";
-  ui.tutorial = tutorial ? { step: 0, actionDone: false } : null;
+  ui.tutorial = tutorial ? { step: 0, rose: false } : null;
+  if (tutorial) {
+    // Scripted practice market: a tip in the news, enough company cash for a factory, amounts filled in.
+    stockBy(TUT).companyCash = Math.max(stockBy(TUT).companyCash, 120000);
+    addNews([["tut.newsTip", { company: TUT_TRADE }]], "good");
+    ui.amounts[TUT_TRADE] = String(TUT_TRADE_QTY); ui.amounts[TUT] = String(OWNERSHIP_THRESHOLD);
+  }
   ui.placeholder = !persist || tutorial;
   setSpeed(0);
   save();
@@ -258,6 +276,9 @@ function migrate(s) {
   if (s.job === undefined) s.job = null;
   s.hustles = s.hustles || {}; s.personalDebt = s.personalDebt || 0; s.lastSalary = s.lastSalary || 0; s.jobGap = s.jobGap || 0;
   if (s.today && s.today.emp === undefined) s.today.emp = 0;
+  s.incToday = s.incToday || 0; s.lastWorkTax = s.lastWorkTax || 0; s.lastDivTax = s.lastDivTax || 0; s.ebPeak = s.ebPeak || 0;
+  if (!s.tips) s.tips = { seen: {}, queue: [] };
+  if (s.steps === undefined) s.steps = null;
   s.rivals.forEach(r => {
     r.style = OLD_STYLES[r.style] || r.style;
     const tpl = RIVAL_TEMPLATES.find(x => x.name === r.name);
@@ -311,6 +332,45 @@ const salaryPerDay = (level = state.career.level) => Math.round(JOB_SALARIES[lev
 const hustleCount = id => state.hustles[id] || 0;
 const hustleCost = h => Math.round(h.cost * Math.pow(1.5, hustleCount(h.id)));
 const sideIncome = () => HUSTLES.reduce((tt, h) => tt + hustleCount(h.id) * h.income, 0) * (inCrisis() ? 0.7 : 1);
+function incomeTax(gross) {
+  const tx = TAXES[state.difficulty];
+  if (!tx) return 0;
+  let tax = 0, prev = 0;
+  for (const [cap, rate] of tx.bands) { if (gross > prev) tax += (Math.min(gross, cap) - prev) * rate; prev = cap; }
+  return tax;
+}
+const dividendTaxRate = () => (TAXES[state.difficulty] ? TAXES[state.difficulty].dividend : 0);
+// Pay work income into cash. All income of one day shares the same tax bands.
+function earn(gross) {
+  const tax = round2(incomeTax(state.incToday + gross) - incomeTax(state.incToday));
+  state.incToday = round2(state.incToday + gross);
+  state.cash = round2(state.cash + gross - tax);
+  if (tax > 0) tip("tax");
+  return { net: round2(gross - tax), tax };
+}
+// One-time explanations the first time something happens.
+function tip(id) {
+  if (!state || ui.tutorial || state.tips.seen[id]) return;
+  state.tips.seen[id] = true;
+  state.tips.queue.push(id);
+}
+// "First steps" checklist of a new player's first real game.
+function checkSteps() {
+  const st = state && state.steps;
+  if (!st || ui.tutorial) return;
+  const now = { job: !!state.job, minigame: st.flags.mg, profit: st.flags.profit, own: ownedNames().length > 0, improve: st.flags.improve };
+  FIRST_STEPS.forEach(id => {
+    if (st.done[id] || !now[id]) return;
+    st.done[id] = true;
+    awardXP(FIRST_STEP_XP, "xp.reason.step");
+    sound("goal");
+  });
+  if (FIRST_STEPS.every(id => st.done[id])) {
+    state.steps = null;
+    storageSet("inv-firststeps-done", "1");
+    toast(t("steps.allDone"), "big"); confetti();
+  }
+}
 const canWorkToday = () => !!state.job && state.job.startsIn === 0 && !isSunday();
 
 function activeSynergies() {
@@ -570,7 +630,14 @@ function advanceDay() {
       // A bank is calm in normal times and falls hard in a crisis.
       if (state.recession && Math.random() < 0.10) { p *= 0.75; notes.push(["news.bankRun", {}]); }
       if (state.depression) p *= 0.97;
-      if (!inCrisis() && p < EUROBANK_BASE) p += (EUROBANK_BASE - p) * 0.04;   // climbs back afterwards
+      if (!inCrisis()) {
+        if (state.ebPeak) {
+          // Hardcore: a strong rebound to just above the old level, easing into the usual calm growth.
+          const target = state.ebPeak * 1.03;
+          p += (target - p) * 0.18;
+          if (p >= target * 0.98) state.ebPeak = 0;
+        } else if (p < EUROBANK_BASE) p += (EUROBANK_BASE - p) * 0.04;      // climbs back afterwards
+      }
       p = Math.max(p, EUROBANK_BASE * 0.1);                                 // too big to fail completely
     }
     if (s.name === "SpaceY") {
@@ -580,6 +647,10 @@ function advanceDay() {
     if (!tut && Math.random() < 0.008 * ((100 - s.ceo.reliability) / 100)) {
       s.reputation = clamp(s.reputation - 8, 0, 100); p *= 0.92;
       notes.push(["news.scandal", { company: s.name }]);
+    }
+    if (tut && s.name === TUT_TRADE) {
+      if (!ui.tutorial.rose && qtyOf(TUT_TRADE) > 0) { p = s.price * 1.08; ui.tutorial.rose = true; }   // the tip in the news comes true
+      else p = Math.max(p, s.price);
     }
     s.price = round2(Math.max(0, p));
     s.history.push(s.price);
@@ -602,10 +673,14 @@ function advanceDay() {
     }
   });
 
-  state.cash = round2(state.cash + dividend);
-  state.lastDividend = round2(dividend);
+  const divTax = round2(dividend * dividendTaxRate());
+  if (divTax > 0) tip("tax");
+  state.cash = round2(state.cash + dividend - divTax);
+  state.lastDividend = round2(dividend - divTax);
+  state.lastDivTax = divTax;
   dailyWork(notes, tut);
   if (!tut) rivalsAct(notes);
+  if (notes.some(n => /^news\.rival(Buys|Short|Snipes)$/.test(n[0]))) tip("rival");
 
   // Economic cycle
   const roll = Math.random();
@@ -634,6 +709,8 @@ function advanceDay() {
     }
   } else if (roll < diff().recession) {
     state.recession = true; state.recessionDays = 1;
+    if (state.difficulty === "hardcore") { const eb = stockBy("EuroBank"); if (eb && !eb.bankrupt) state.ebPeak = Math.max(state.ebPeak || 0, eb.price); }
+    tip("recession");
     headline = ["news.recession", { event: ev.id }]; kind = "bad";
     sound("bad");
   }
@@ -793,7 +870,8 @@ function rivalsAct(notes) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function dailyWork(notes, tut) {
-  state.lastSalary = 0;
+  state.lastSalary = 0; state.lastWorkTax = 0; state.incToday = 0;
+  let gross = 0;
   const c = state.career, j = state.job;
   if (j) {
     const emp = stockBy(j.company);
@@ -803,9 +881,7 @@ function dailyWork(notes, tut) {
     } else if (j.startsIn > 0) {
       j.startsIn--;
     } else if (!isSunday()) {
-      const sal = salaryPerDay();
-      state.cash = round2(state.cash + sal);
-      state.lastSalary = sal;
+      gross += salaryPerDay();
       c.xp += JOB_DAILY_XP; c.since++;
       if (c.since >= REVIEW_WORKDAYS) {
         c.since = 0;
@@ -829,8 +905,8 @@ function dailyWork(notes, tut) {
     }
     if (state.job) state.job.played = false;
   }
-  const side = sideIncome();
-  if (side > 0) { state.cash = round2(state.cash + side); state.lastSalary = round2(state.lastSalary + side); }
+  gross += sideIncome();
+  if (gross > 0) { const r = earn(gross); state.lastSalary = r.net; state.lastWorkTax = r.tax; }
   if (state.personalDebt > 0) state.personalDebt = round2(state.personalDebt * (1 + PERSONAL_LOAN_RATE));
 }
 
@@ -852,14 +928,15 @@ function finishMiniGame(score) {
   const tier = MG_TIERS.find(x => score >= x.min) || null;
   const bonus = tier ? Math.round(salaryPerDay() * tier.pay) : 0;
   const xp = tier ? tier.xp : 0;
-  state.cash = round2(state.cash + bonus);
+  const paid = bonus ? earn(bonus) : { net: 0, tax: 0 };
   state.career.xp += xp;
+  if (state.steps) state.steps.flags.mg = true;
   state.job.played = true;
   if (tier && tier.id === "perfect") unlock("perfect");
   if (score >= 0.5) goalProgress("minigame");
   sound(tier ? (tier.id === "perfect" || tier.id === "gold" ? "achievement" : "goal") : "error");
   if (tier && tier.id !== "bronze") confetti();
-  ui.modal = { type: "mgresult", tier: tier ? tier.id : "none", bonus, xp, pct: Math.round(score * 100) };
+  ui.modal = { type: "mgresult", tier: tier ? tier.id : "none", bonus: paid.net, tax: paid.tax, xp, pct: Math.round(score * 100) };
   checkMilestones(totalValue());
   save(); render();
 }
@@ -949,6 +1026,7 @@ function sellStock(name) {
   h.qty -= qty;
   if (h.qty <= 0) delete state.holdings[name];
   logTrade(name, "sell", qty, s.price);
+  if (profit > 0 && state.steps) state.steps.flags.profit = true;
   if (profit > 0 && gross >= MIN_XP_TRADE_VALUE && state.today.sellXp < MAX_SELL_XP_PER_DAY) {
     state.today.sellXp++;
     awardXP(XP_REWARDS.sell_profit, "xp.reason.profit");
@@ -1113,7 +1191,7 @@ function companyAction(action, arg) {
   }
   if (done && action !== "inject" && action !== "dividend") {
     goalProgress("actions");
-    if (ui.tutorial) ui.tutorial.actionDone = true;
+    if (state.steps) state.steps.flags.improve = true;
   }
   afterAction();
 }
@@ -1176,6 +1254,7 @@ function startWar(att, type) {
 function resolveChoice(i) {
   const pc = state.pendingChoice;
   if (!pc) return;
+  state.tips.seen.choice = true;
   const ev = D.CHOICE_EVENTS.find(e => e.id === pc.id);
   const s = stockBy(pc.company);
   const opt = ev && ev.options[i];
@@ -1321,21 +1400,38 @@ function toast(text, kind = "") {
 // ═══════════════════════════════════════════════════════════════════════════
 // Each step: target (CSS selector to highlight), done() → true moves on. Steps without done() show a "Next" button.
 
-const TUT = "EuroBank";
+const TUT = "EuroBank";            // the company you take over
+const TUT_TRADE = "FreshMart";     // the share you trade for a quick profit
+const TUT_TRADE_QTY = 10;
 const TUTORIAL_STEPS = [
   { id: "welcome" },
-  { id: "market", target: () => `.stock[data-name="${TUT}"]`, tab: "market" },
-  { id: "buy", target: () => `.stock[data-name="${TUT}"]`, tab: "market", done: () => qtyOf(TUT) >= OWNERSHIP_THRESHOLD },
-  { id: "owner", target: () => `[data-act="tab"][data-arg="company"]`, done: () => ui.tab === "company" },
-  { id: "dividend", target: () => `#dividend-row`, done: () => stockBy(TUT).dividendRate === 50 },
+  // 1. Trade
+  { id: "news", target: () => `#newsrow .news`, tab: "market" },
+  { id: "buy", target: () => `.stock[data-name="${TUT_TRADE}"]`, tab: "market", done: () => qtyOf(TUT_TRADE) >= TUT_TRADE_QTY },
   { id: "nextday", target: () => `.next`, done: () => state.day >= 2 },
-  { id: "income", target: () => `.news.mini` },
-  { id: "action", target: () => `#company-actions`, tab: "company", done: () => ui.tutorial.actionDone },
-  { id: "alerts", target: () => `.stock [data-act="alerts"]`, tab: "market" },
-  { id: "rivals", target: () => `[data-act="tab"][data-arg="rivals"]` },
+  { id: "profit", target: () => `[data-act="tab"][data-arg="portfolio"]`, done: () => ui.tab === "portfolio" },
+  { id: "gain", target: () => `#main .card` },
+  { id: "sell", target: () => `.stock[data-name="${TUT_TRADE}"]`, tab: "market", done: () => qtyOf(TUT_TRADE) === 0 },
+  // 2. Work
+  { id: "work", target: () => `[data-act="tab"][data-arg="work"]`, done: () => ui.tab === "work" },
+  { id: "job", target: () => `#job-card`, tab: "work", done: () => !!state.job },
+  { id: "overtime", target: () => `[data-act="overtime"]`, tab: "work", done: () => !!state.job && state.job.played },
+  // 3. Own
+  { id: "own", target: () => `.stock[data-name="${TUT}"]`, tab: "market", done: () => qtyOf(TUT) >= OWNERSHIP_THRESHOLD },
+  { id: "owner", target: () => `[data-act="tab"][data-arg="company"]`, done: () => ui.tab === "company" },
+  { id: "dividend", target: () => `#dividend-row`, tab: "company", done: () => stockBy(TUT).dividendRate === 50 },
+  { id: "factory", target: () => `#company-actions`, tab: "company", done: () => stockBy(TUT).factories >= 1 },
+  { id: "payday", target: () => `.next`, done: () => state.day >= 3 },
+  { id: "income", target: () => `#newsrow .mini` },
+  // 4. The daily routine
   { id: "done" },
 ];
 
+function tutParams() {
+  const h = state.holdings[TUT_TRADE], tr = stockBy(TUT_TRADE);
+  return { company: TUT, trade: TUT_TRADE, n: OWNERSHIP_THRESHOLD, qty: TUT_TRADE_QTY,
+    gain: fmtShort(h ? (tr.price - h.avg) * h.qty : 0), cost: fmtShort(FACTORY_COST) };
+}
 function tutorialStep() { return ui.tutorial ? TUTORIAL_STEPS[ui.tutorial.step] : null; }
 function tutorialTick() {
   const st = tutorialStep();
@@ -1344,6 +1440,7 @@ function tutorialTick() {
   sound("goal");
   const next = tutorialStep();
   if (next && next.tab && ui.tab !== next.tab) ui.tab = next.tab;
+  if (next && next.id === "owner") ui.selected = TUT;
 }
 function renderTutorial() {
   const box = $("tutorial");
@@ -1355,8 +1452,9 @@ function renderTutorial() {
   box.hidden = false;
   box.innerHTML = `<div class="tut-top"><span class="label">🎓 ${t("tut.title")} • ${n + 1}/${TUTORIAL_STEPS.length}</span>
       <button class="x" data-act="tut-skip" aria-label="${esc(t("tut.skip"))}">✕</button></div>
-    <h3>${t(`tut.${st.id}.title`, { company: TUT, n: OWNERSHIP_THRESHOLD })}</h3>
-    <p>${t(`tut.${st.id}.text`, { company: TUT, n: OWNERSHIP_THRESHOLD })}</p>
+    <h3>${t(`tut.${st.id}.title`, tutParams())}</h3>
+    <p>${t(`tut.${st.id}.text`, tutParams())}</p>
+    ${last ? `<ol class="tut-loop">${[1, 2, 3, 4, 5].map(k => `<li>${t(`tut.loop.${k}`)}</li>`).join("")}</ol>` : ""}
     <div class="btn-row">
       ${last ? btn(t("tut.finish"), "tut-finish", { color: "#22c55e", cls: "lg" })
         : st.done ? `<span class="tut-wait">${t("tut.waiting")}</span>` : btn(t("tut.next"), "tut-next", { color: "#a78bfa" })}
@@ -1411,8 +1509,9 @@ function renderHeader() {
   const n = state.news[0], g = state.goal;
   $("newsrow").innerHTML = `
     <div class="card news ${n ? n.kind : ""}"><span class="kicker">${t("news.title")}</span><div>${n ? esc(I18N.newsText(n)) : ""}</div></div>
-    ${state.lastDividend > 0 ? `<div class="card news good mini"><span class="kicker">${t("dividend")}</span><strong>+${fmtShort(state.lastDividend)}</strong></div>` : ""}
-    ${state.lastSalary > 0 ? `<div class="card news good mini"><span class="kicker">${t("job.card")}</span><strong>+${fmtShort(state.lastSalary)}</strong></div>` : ""}
+    ${state.lastDividend > 0 ? `<div class="card news good mini"><span class="kicker">${t("dividend")}</span><strong>+${fmtShort(state.lastDividend)}</strong>${state.lastDivTax > 0 ? `<span class="muted small-t">${t("tax.paid", { amount: fmtShort(state.lastDivTax) })}</span>` : ""}</div>` : ""}
+    ${state.lastSalary > 0 ? `<div class="card news good mini"><span class="kicker">${t("job.card")}</span><strong>+${fmtShort(state.lastSalary)}</strong>${state.lastWorkTax > 0 ? `<span class="muted small-t">${t("tax.paid", { amount: fmtShort(state.lastWorkTax) })}</span>` : ""}</div>` : ""}
+    ${renderTip()}${renderSteps()}
     ${g && !ui.tutorial ? `<div class="card news goal ${g.done ? "done" : ""}"><span class="kicker">🎯 ${t("goal.daily")} ${g.done ? "✓" : `(+${g.xp} XP)`}</span><div>${esc(goalText(g))}${!g.done && ["buys", "actions"].includes(g.type) ? ` — ${g.progress}/${g.target}` : ""}</div></div>` : ""}`;
   $("controlbar").innerHTML = `
     <button class="next" data-act="next" ${state.gameOver || state.gameWon ? "disabled" : ""}>${t("nextDay")}</button>
@@ -1420,6 +1519,21 @@ function renderHeader() {
       ${SPEED_LABELS.map((l, i) => `<button class="${ui.speed === i ? "on" : ""}" data-act="speed" data-arg="${i}" aria-pressed="${ui.speed === i}" ${ui.tutorial && i ? "disabled" : ""} title="${esc(i ? t("autoplay.speed", { speed: l }) : t("autoplay.pause"))}">${l}</button>`).join("")}
     </div>`;
   $("foot").innerHTML = `<a href="online.html">🌐 ${t("menu.online")}</a> • ${t("footer.rules")}`;
+}
+
+function renderTip() {
+  const id = state.tips.queue[0];
+  if (!id || ui.tutorial) return "";
+  return `<div class="card news tip"><span class="kicker">💡 ${t("tip.title")}</span><div>${t(`tip.${id}`)}</div>
+    <div class="mt8">${btn(t("tip.ok"), "tip-ok", { color: "#f59e0b", cls: "small" })}</div></div>`;
+}
+function renderSteps() {
+  const st = state.steps;
+  if (!st || ui.tutorial) return "";
+  const next = FIRST_STEPS.find(id => !st.done[id]);
+  const n = FIRST_STEPS.filter(id => st.done[id]).length;
+  return `<div class="card news steps"><span class="kicker">🧭 ${t("steps.title")} ${n}/${FIRST_STEPS.length} (+${FIRST_STEP_XP} XP)</span>
+    ${FIRST_STEPS.map(id => `<div class="step ${st.done[id] ? "ok" : id === next ? "now" : ""}">${st.done[id] ? "✓" : id === next ? "▸" : "•"} ${t(`steps.${id}`, { n: OWNERSHIP_THRESHOLD })}</div>`).join("")}</div>`;
 }
 
 function renderTabs() {
@@ -1431,7 +1545,7 @@ function renderTabs() {
   $("tabs").innerHTML = tabs.map(([k, l]) => {
     const dis = k === "company" && !owned.length;
     return `<button class="tab ${ui.tab === k ? "on" : ""}" data-act="tab" data-arg="${k}" ${dis ? `disabled title="${esc(t("company.none"))}"` : ""}>${l}</button>`;
-  }).join("");
+  }).join("") + `<button class="tab" data-act="glossary" aria-label="${esc(t("glossary.title"))}" title="${esc(t("glossary.title"))}">❓</button>`;
 }
 
 function stockMatchesFilter(s) {
@@ -1637,7 +1751,7 @@ function renderWork() {
   const levelName = t(`job.level.${c.level}`);
   let jobCard;
   if (!j) {
-    jobCard = `<div class="card span-all"><span class="label">💼 ${t("job.title")}</span>
+    jobCard = `<div class="card span-all" id="job-card"><span class="label">💼 ${t("job.title")}</span>
       <div class="mb6">${t("job.none")}</div>
       <div class="muted small-t mb6">${t("job.startLevel", { level: levelName })} • ${t("job.salary", { amount: fmtShort(salaryPerDay()) })}${state.jobGap ? ` • ${t("job.startsIn", { n: state.jobGap })}` : ""}</div>
       ${employerList()}</div>`;
@@ -1648,7 +1762,7 @@ function renderWork() {
     jobCard = `<div class="card span-all">
       <div class="row-between"><div><span class="label">💼 ${t("job.title")}</span>
         <div class="rank">${esc(levelName)}</div><div class="muted">${t("job.employer")}: <b>${esc(j.company)}</b></div></div>
-        <div class="right"><div class="big-num">${t("job.salary", { amount: fmtShort(salaryPerDay()) })}</div><div class="muted small-t">${t("job.salaryYear", { amount: fmtShort(JOB_SALARIES[c.level]) })}</div></div></div>
+        <div class="right"><div class="big-num">${t("job.salary", { amount: fmtShort(salaryPerDay()) })}</div><div class="muted small-t">${t("job.salaryYear", { amount: fmtShort(JOB_SALARIES[c.level]) })}</div>${incomeTax(salaryPerDay()) > 0 ? `<div class="muted small-t">${t("tax.net", { amount: fmtShort(salaryPerDay() - incomeTax(salaryPerDay())) })}</div>` : ""}</div></div>
       ${need ? `<div class="progress-top mt8"><span>${t("job.xp", { xp: c.xp, need })}</span><span>${t("job.review", { n: REVIEW_WORKDAYS - c.since })}</span></div>
         <div class="bar"><div style="width:${Math.min(100, c.xp / need * 100)}%;background:#22c55e"></div></div>` : `<div class="mt8" style="color:#f59e0b">${t("job.maxLevel")}</div>`}
       ${j.startsIn > 0 ? `<div class="warn mt8">${t("job.startsIn", { n: j.startsIn })}</div>` : isSunday() ? `<div class="warn mt8">😴 ${t("job.sunday")}</div>` : ""}
@@ -1673,7 +1787,9 @@ function renderWork() {
     <div class="row-between"><div>${state.personalDebt > 0 ? `<span style="color:#f97316">${t("loan.debt", { amount: fmtShort(state.personalDebt) })}</span>` : `<span class="muted">${t("loan.none")}</span>`}</div>
     <div class="btn-row">${state.personalDebt > 0 ? btn(t("loan.repay", { amount: fmtShort(Math.min(state.cash, state.personalDebt)) }), "loan-repay", { color: "#14b8a6", disabled: state.cash < 0.01 })
       : btn(t("loan.take", { amount: fmtShort(PERSONAL_LOAN) }), "loan-take", { color: "#06b6d4" })}</div></div></div>`;
-  return `<div class="grid">${jobCard}${hustles}${loan}</div>`;
+  const tx = TAXES[state.difficulty];
+  const taxCard = `<div class="card span-all muted small-t">🧾 ${tx ? t("tax.info", { a: tx.bands[0][1] * 100, b: tx.bands[1][1] * 100, c: tx.bands[2][1] * 100, d: tx.dividend * 100, x: fmtShort(tx.bands[0][0]), y: fmtShort(tx.bands[1][0]) }) : t("tax.none")}</div>`;
+  return `<div class="grid">${jobCard}${hustles}${loan}${taxCard}</div>`;
 }
 
 function renderRivals() {
@@ -1752,6 +1868,7 @@ function renderSettings() {
 function render() {
   if (!state) return;
   tutorialTick();
+  checkSteps();
   renderHeader();
   renderTabs();
   const main = $("main");
@@ -1829,6 +1946,7 @@ function renderModal() {
     const s = pc && stockBy(pc.company);
     if (!ev || !s) { ui.modal = null; state.pendingChoice = null; root.innerHTML = ""; document.body.classList.remove("modal-open"); return; }
     inner = `<h2>${t(`choice.${ev.id}.title`)}</h2><p>${esc(t(`choice.${ev.id}.text`, { company: s.name }))}</p><p class="muted small-t">${t("choice.cash", { company: esc(s.name), cash: fmtShort(s.companyCash) })}</p>
+      ${state.tips.seen.choice ? "" : `<p class="tip-line">💡 ${t("tip.choice")}</p>`}
       <div class="stack mt8">${ev.options.map((o, i) => btn(esc(t(`choice.${ev.id}.o${i}`)), "choose", { arg: i, color: i === 0 ? "#22c55e" : "#94a3b8", disabled: !!(o.pay && s.companyCash < o.pay), cls: "lg" })).join("")}</div>`;
   } else if (m.type === "chart") {
     const s = stockBy(m.name);
@@ -1855,6 +1973,9 @@ function renderModal() {
       <span class="label mt8">${t("ipo.sector")}</span>
       <select class="input" data-ipo-sector>${D.SECTORS.map(k => `<option value="${k}" ${ui.ipoSector === k ? "selected" : ""}>${esc(sectorName(k))}</option>`).join("")}</select>
       <div class="btn-row mt12">${btn(t("ipo.go"), "ipo-go", { color: "#f59e0b", cls: "lg" })}</div>`;
+  } else if (m.type === "glossary") {
+    inner = `<div class="row-between"><h2>❓ ${t("glossary.title")}</h2><button class="x" data-act="close" aria-label="${esc(t("close"))}">✕</button></div>
+      <dl class="glossary">${GLOSSARY.map(k => `<dt>${t(`glossary.${k}`)}</dt><dd>${t(`glossary.${k}.text`, { n: OWNERSHIP_THRESHOLD, ceo: CEO_THRESHOLD })}</dd>`).join("")}</dl>`;
   } else if (m.type === "jobs") {
     inner = `<div class="row-between"><h2>💼 ${t("job.pick")}</h2><button class="x" data-act="close" aria-label="${esc(t("close"))}">✕</button></div>
       <p class="muted small-t">${t("job.startLevel", { level: t(`job.level.${state.career.level}`) })} • ${t("job.salary", { amount: fmtShort(salaryPerDay()) })}${state.job ? ` • ${t("job.switchNote", { n: JOB_SWITCH_DAYS })}` : ""}</p>
@@ -1866,7 +1987,7 @@ function renderModal() {
   } else if (m.type === "mgresult") {
     inner = `<div class="end-icon">${{ perfect: "💎", gold: "🥇", silver: "🥈", bronze: "🥉", none: "😅" }[m.tier]}</div>
       <h2>${t(`mg.result.${m.tier}`)}</h2><p class="muted">${t("mg.score", { pct: m.pct })}</p>
-      ${m.bonus ? `<p><strong style="color:#22c55e">${t("mg.reward", { amount: fmtShort(m.bonus), xp: m.xp })}</strong></p>` : ""}
+      ${m.bonus ? `<p><strong style="color:#22c55e">${t("mg.reward", { amount: fmtShort(m.bonus), xp: m.xp })}</strong>${m.tax > 0 ? `<br><span class="muted small-t">${t("tax.paid", { amount: fmtShort(m.tax) })}</span>` : ""}</p>` : ""}
       <div class="btn-row center mt12">${btn(t("mg.done"), "close", { color: "#a78bfa", cls: "lg" })}</div>`;
   } else if (m.type === "confirm-new") {
     inner = `<h2>${t("confirm.newTitle")}</h2><p class="muted">${t("confirm.newText", { n: state.day })}</p>
@@ -1937,12 +2058,26 @@ function drawChart(name) {
 
 function openMenu() { setSpeed(0); ui.menuStep = "main"; openModal({ type: "menu" }); }
 
+// The screen is redrawn after most clicks, so the pressed button is replaced by a new one.
+// Let that new button spring back up, so a tap feels like really pushing it.
+function popAfterRender(act, arg) {
+  requestAnimationFrame(() => {
+    const sel = `[data-act="${CSS.escape(act)}"]` + (arg !== undefined ? `[data-arg="${CSS.escape(arg)}"]` : "");
+    const el = document.querySelector(`#app ${sel}, #modal-root ${sel}`);
+    if (!el || el.disabled) return;
+    el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+  });
+}
+
 document.addEventListener("click", e => {
   const el = e.target.closest("[data-act]");
   if (!el || el.disabled) return;
   const act = el.dataset.act, arg = el.dataset.arg;
+  popAfterRender(act, arg);
   if (act.startsWith("c:")) return companyAction(act.slice(2), arg);
   switch (act) {
+    case "tip-ok": state.tips.queue.shift(); save(); render(); break;
+    case "glossary": setSpeed(0); openModal({ type: "glossary" }); break;
     case "next": advanceDay(); break;
     case "speed": setSpeed(Number(arg)); render(); break;
     case "tab": ui.tab = arg; render(); window.scrollTo({ top: Math.min(window.scrollY, $("tabs").offsetTop - 8) }); break;
@@ -1981,7 +2116,7 @@ document.addEventListener("click", e => {
     case "hustle-buy": buyHustle(arg); break;
     case "loan-take": takeLoan(); break;
     case "loan-repay": repayLoan(); break;
-    case "tutorial": ui.modal = null; newGame("easy", { tutorial: true }); render(); break;
+    case "tutorial": ui.modal = null; newGame("normal", { tutorial: true }); render(); break;
     case "tut-next": ui.tutorial.step++; { const n = tutorialStep(); if (n && n.tab) ui.tab = n.tab; } render(); break;
     case "tut-skip": ui.tutorial = null; state = null; boot(true); break;
     case "tut-finish": unlockTutorialAndExit(); break;

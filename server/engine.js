@@ -65,7 +65,9 @@ function randomCeo() {
 // Room lifecycle
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DEFAULT_SETTINGS = { speed: "normal", target: "10m", startCash: 50000, dayLimit: 100 };
+// Dividend tax, chosen by the host. Tax leaves the game (it is not paid to anyone).
+const TAX_RATES = { none: 0, normal: 0.25, high: 0.40 };
+const DEFAULT_SETTINGS = { speed: "normal", target: "10m", startCash: 50000, dayLimit: 100, tax: "normal" };
 function sanitizeSettings(s = {}, base = DEFAULT_SETTINGS) {
   s = s && typeof s === "object" ? s : {};
   return {
@@ -73,6 +75,7 @@ function sanitizeSettings(s = {}, base = DEFAULT_SETTINGS) {
     target: TARGETS[s.target] ? s.target : base.target,
     startCash: START_CASH.includes(s.startCash) ? s.startCash : base.startCash,
     dayLimit: DAY_LIMITS.includes(s.dayLimit) ? s.dayLimit : base.dayLimit,
+    tax: TAX_RATES[s.tax] !== undefined ? s.tax : base.tax,
   };
 }
 
@@ -105,7 +108,7 @@ function addPlayer(room, id, name) {
   room.players[id] = {
     id, name: unique, color, cash: room.settings.startCash, holdings: {}, avg: {}, shorts: {},
     connected: true, skip: false, autoSkip: false, lastActiveDay: room.day, pauseTokens: PAUSE_TOKENS,
-    pendingChoice: null, lastDividend: 0,
+    pendingChoice: null, lastDividend: 0, lastTax: 0,
   };
   room.order.push(id);
   if (!room.hostId) room.hostId = id;
@@ -526,7 +529,8 @@ function advanceDay(room) {
   const mult = typeof ev.multiplier === "function" ? ev.multiplier() : ev.multiplier;
   const notes = [];
   const players = Object.values(room.players);
-  players.forEach(p => { p.lastDividend = 0; });
+  players.forEach(p => { p.lastDividend = 0; p.lastTax = 0; });
+  const taxRate = TAX_RATES[room.settings.tax] || 0;
 
   players.forEach(p => {
     if (p.pendingChoice) {
@@ -542,7 +546,7 @@ function advanceDay(room) {
       const pool = profit * s.dividendRate / 100;
       const holders = players.filter(p => qty(p, s.name) > 0);
       const total = holders.reduce((tt, p) => tt + qty(p, s.name), 0);
-      holders.forEach(p => { const d = pool * qty(p, s.name) / total; p.cash = round2(p.cash + d); p.lastDividend += d; });
+      holders.forEach(p => { const gross = pool * qty(p, s.name) / total, tax = gross * taxRate, d = gross - tax; p.cash = round2(p.cash + d); p.lastDividend += d; p.lastTax += tax; });
       s.companyCash += profit - pool;
     } else s.companyCash += profit;
     if (!s.ownerId) aiManage(s);
@@ -678,7 +682,7 @@ function viewFor(room, playerId, now) {
     winnerId: room.winnerId, end: room.end,
     me: me ? {
       id: me.id, name: me.name, color: me.color, cash: me.cash, holdings: me.holdings, avg: me.avg, shorts: me.shorts,
-      skip: me.skip, autoSkip: me.autoSkip, pauseTokens: me.pauseTokens, lastDividend: round2(me.lastDividend),
+      skip: me.skip, autoSkip: me.autoSkip, pauseTokens: me.pauseTokens, lastDividend: round2(me.lastDividend), lastTax: round2(me.lastTax || 0),
       netWorth: round2(netWorth(room, me)), choice, isHost: room.hostId === me.id,
     } : null,
   };

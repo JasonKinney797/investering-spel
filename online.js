@@ -93,7 +93,7 @@ const ui = {
   tab: "market", amounts: {}, selected: null, chatDraft: "", modal: null, alertPrice: "",
   name: storageGet(NAME_KEY) || "",
   joinCode: (new URLSearchParams(location.search).get("room") || "").toUpperCase().slice(0, 4),
-  settings: { speed: "normal", target: "10m", startCash: 50000, dayLimit: 100 },
+  settings: { speed: "normal", target: "10m", startCash: 50000, dayLimit: 100, tax: "normal" },
   deal: { to: "", giveCash: "", giveStock: "", giveQty: "", wantCash: "", wantStock: "", wantQty: "" },
   seenChat: 0, seenDeals: new Set(),
   notify: storageGet(NOTIFY_KEY) !== "0",
@@ -258,7 +258,7 @@ function renderHeader() {
   progress.innerHTML = `<div class="progress-top"><span>${t("online.goal", { target: fmtShort(room.target) })}</span><span>${I18N.num(p, 2)}%</span></div><div class="bar thin"><div style="width:${p}%;background:${me.color}"></div></div>`;
   const n = room.news[0];
   newsrow.innerHTML = `<div class="card news ${n ? n.kind : ""}"><span class="kicker">${t("news.title")} • ${t("day.short", { n: n ? n.day : "" })}</span><div>${n ? esc(I18N.newsText(n)) : ""}</div></div>
-    ${me.lastDividend > 0 ? `<div class="card news good mini"><span class="kicker">${t("dividend")}</span><strong>+${fmtShort(me.lastDividend)}</strong></div>` : ""}`;
+    ${me.lastDividend > 0 ? `<div class="card news good mini"><span class="kicker">${t("dividend")}</span><strong>+${fmtShort(me.lastDividend)}</strong>${me.lastTax > 0 ? `<span class="muted small-t">${t("tax.paid", { amount: fmtShort(me.lastTax) })}</span>` : ""}</div>` : ""}`;
 
   if (room.phase !== "playing") { bar.hidden = true; return; }
   bar.hidden = false;
@@ -303,7 +303,8 @@ function settingsFields(s) {
   return `${select(t("online.speed"), "speed", [["calm", t("online.speed.calm")], ["normal", t("online.speed.normal")], ["turbo", t("online.speed.turbo")]], s.speed)}
     ${select(t("online.target"), "target", [["1m", fmtShort(1e6)], ["10m", fmtShort(1e7)], ["100m", fmtShort(1e8)], ["1b", fmtShort(1e9)]], s.target)}
     ${select(t("online.startCash"), "startCash", [[10000, fmtShort(10000)], [50000, fmtShort(50000)], [250000, fmtShort(250000)]], s.startCash)}
-    ${select(t("online.dayLimit"), "dayLimit", [[50, t("online.days", { n: 50 })], [100, t("online.days", { n: 100 })], [200, t("online.days", { n: 200 })], [0, t("online.noLimit")]], s.dayLimit)}`;
+    ${select(t("online.dayLimit"), "dayLimit", [[50, t("online.days", { n: 50 })], [100, t("online.days", { n: 100 })], [200, t("online.days", { n: 200 })], [0, t("online.noLimit")]], s.dayLimit)}
+    ${select(t("online.tax"), "tax", [["none", t("online.tax.none")], ["normal", t("online.tax.normal")], ["high", t("online.tax.high")]], s.tax)}`;
 }
 
 function renderMenu() {
@@ -336,7 +337,7 @@ function renderLobby() {
     <div class="card"><span class="label">${t("online.players", { n: room.players.length, max: 8 })}</span>
       ${room.players.map(p => `<div class="sum-row"><span><span class="dot" style="background:${p.color}"></span>${esc(p.name)}${p.id === room.hostId ? " 👑" : ""}${p.id === me.id ? ` (${t("you")})` : ""}</span><span class="muted small-t">${p.connected ? t("online.ready") : t("conn.connecting")}</span></div>`).join("")}</div>
     <div class="card"><span class="label">${t("online.settings")} ${host ? "" : `(${t("online.hostChooses")})`}</span>
-      ${host ? `<div class="form-grid">${settingsFields(s)}</div>` : `<div class="muted lh">${t("online.speed")}: ${speedLabel[s.speed]}<br>${t("online.target")}: ${fmtShort(room.target)}<br>${t("online.startCash")}: ${fmtShort(s.startCash)}<br>${t("online.dayLimit")}: ${s.dayLimit ? t("online.days", { n: s.dayLimit }) : t("online.noLimit")}</div>`}</div>
+      ${host ? `<div class="form-grid">${settingsFields(s)}</div>` : `<div class="muted lh">${t("online.speed")}: ${speedLabel[s.speed]}<br>${t("online.target")}: ${fmtShort(room.target)}<br>${t("online.startCash")}: ${fmtShort(s.startCash)}<br>${t("online.dayLimit")}: ${s.dayLimit ? t("online.days", { n: s.dayLimit }) : t("online.noLimit")}<br>${t("online.tax")}: ${t(`online.tax.${s.tax || "normal"}`)}</div>`}</div>
     <div class="span-all btn-row center">
       ${host ? btn(room.players.length < 2 ? `▶ ${t("online.startTest")}` : `▶ ${t("online.start")}`, "start", { color: "#22c55e", cls: "lg" }) : `<div class="muted">${t("online.waitHost")}</div>`}
       ${btn(t("online.leave"), "leave", { color: "#64748b", cls: "lg" })}

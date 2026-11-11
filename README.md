@@ -14,7 +14,9 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 ## Features
 
 - **Start menu**: Play, Tutorial, or Online, plus a language picker and a sound toggle.
-- **Tutorial**: an 11-step guided tour in a calm practice market (buy, become owner, dividend, next day, company actions, alerts, rivals).
+- **Tutorial**: a hands-on tour of the daily routine on Normal difficulty, in a scripted practice market: read the news, buy and sell at a profit, get a job and play the overtime mini-game, take over a company, set a dividend, build a factory, collect your income.
+- **First steps, tips and glossary**: a short checklist guides your first real game, one-time tips explain your first recession, rival attack, news choice and tax, and the ❓ button explains the terms.
+- **Taxes**: none on Easy. Normal: income tax 10/20/30% in daily bands (up to €100, up to €400, above) and 25% on dividends. Hardcore: 15/30/40% and 40% on dividends. Selling shares is tax-free. Online, the host picks the dividend tax (none, 25% or 40%).
 - **10 companies in 10 sectors**: TechNova, GreenVolt, EuroBank, MedFuture, SpaceY, PixelForge (gaming), FreshMart (retail), SkyLine Air (transport), BuildCo (construction), StreamWave (media). Filter the market by sector or "Mine".
 - **Price alerts**: tap 🔔 on a stock to get notified when it goes above or below a price.
 - **Saving**: autosaves in the browser, plus export and import of a save file.
@@ -31,7 +33,7 @@ Plain **HTML, CSS and JavaScript**: no build step and no dependencies. Open `ind
 - **10 overtime mini-games**: one per company, playable once per working day (`minigames.js`). A good score pays up to 4× your daily salary and a lot of job XP: Checkout Rush, Spot the Fake, Bug Squash, Grid Balance, Lab Mix, Launch Window, QA Tester, Trend Hunter, Gate Sort, Stack It.
 - **Side hustles**: lemonade stand, bike delivery, food truck, laundromat, rental flat. Pay once, earn every day (max 3 of each).
 - **Personal loan**: €1,000 at 1.5% interest per day, for when you are broke.
-- **EuroBank**: steady in normal times, but it crashes hard in a recession (bank runs) and collapses in a depression.
+- **EuroBank**: steady in normal times, but it crashes hard in a recession (bank runs) and collapses in a depression. On Hardcore it rebounds quickly to just above its old level once the crisis is over.
 - **Daily goals**: a new goal every day for extra XP.
 - **Sound and confetti**: real sound effects (Kenney, CC0, in `assets/sounds/`), can be turned off. Confetti for achievements.
 

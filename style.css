@@ -431,3 +431,25 @@ select.input { padding: 7px 10px; }
 .tube { font-size: 30px; min-height: 84px; background: color-mix(in srgb, var(--c) 25%, #000); border-color: var(--c); opacity: 0.55; }
 .tube.lit { opacity: 1; background: var(--c); transform: scale(1.06); }
 @media (max-height: 520px) and (orientation: landscape) { .mg-body { min-height: 150px; } .grid9, .grid25 { max-width: 210px; } .tube { min-height: 56px; } }
+
+/* ── Push-button feel: a raised edge that sinks when pressed and springs back ── */
+.btn, .next, .menu-btn, .diff, .mg-big, .mg-opt { transition: transform 0.07s ease, box-shadow 0.07s ease, background 0.15s, filter 0.15s; }
+.btn:not(:disabled) { box-shadow: 0 3px 0 color-mix(in srgb, var(--c) 42%, #05070f); }
+.btn:not(:disabled):active { transform: translateY(3px); box-shadow: 0 0 0 color-mix(in srgb, var(--c) 42%, #05070f); filter: brightness(1.3); }
+.next:not(:disabled) { box-shadow: 0 4px 0 #4c1d95; }
+.next:not(:disabled):active { transform: translateY(4px); box-shadow: 0 0 0 #4c1d95; filter: brightness(1.15); }
+.menu-btn:active, .diff:active, .mg-big:active, .mg-opt:active, .tab:not(:disabled):active, .speed button:not(:disabled):active { transform: translateY(2px) scale(0.98); filter: brightness(1.2); }
+@keyframes pop { 0% { transform: translateY(3px) scale(0.96); filter: brightness(1.35); } 55% { transform: translateY(-1px) scale(1.03); } 100% { transform: none; filter: none; } }
+.pop { animation: pop 0.24s ease-out; }
+@media (prefers-reduced-motion: reduce) { .pop { animation: none; } .btn, .next { transition: none; } }
+
+/* ── Tips, first steps, glossary, tutorial routine ── */
+.news.tip { border-color: #f59e0b88; background: #f59e0b12; }
+.news.steps .step { font-size: 12px; color: var(--muted); line-height: 1.7; }
+.news.steps .step.ok { color: var(--good); }
+.news.steps .step.now { color: var(--text); font-weight: 600; }
+.tip-line { font-size: 12px; color: #fbbf24; background: #f59e0b12; border: 1px solid #f59e0b44; border-radius: 8px; padding: 8px 10px; }
+.tut-loop { margin: 0 0 10px; padding-left: 20px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
+.glossary dt { font-weight: 700; color: var(--accent-2); margin-top: 10px; }
+.glossary dd { margin: 2px 0 0; font-size: 13px; color: var(--text-2); line-height: 1.5; }
+.news.mini .small-t { display: block; }
