@@ -162,7 +162,6 @@ I18N.add("fr", {
   "company.noProducts": "Aucun produit pour l'instant.",
   "company.synergies": "Synergies actives",
   "company.dividendTitle": "Politique de dividende — actuellement {pct}%",
-  "company.dividendText": "Chaque jour, {pct}% du bénéfice va dans vos liquidités. Le reste reste dans l'entreprise.",
   "company.actions": "Actions de l'entreprise",
   "company.interest": "Intérêts : {pct}%/jour (selon la fiabilité du PDG).",
   "company.inject": "Injecter des fonds (vos liquidités → entreprise)",
@@ -232,7 +231,6 @@ I18N.add("fr", {
   "investor.earn": "Gagner de l'XP",
   "investor.synergies": "Synergies sectorielles",
   "investor.dividendTitle": "Les dividendes expliqués",
-  "investor.dividendText": "Une entreprise que vous possédez fait un bénéfice ou une perte chaque jour. Le <b>dividende</b> est la part du bénéfice versée dans vos liquidités. Le reste reste dans l'entreprise. Les pertes réduisent la trésorerie ; en dessous de {amount}, l'entreprise fait faillite.",
   "xp.list.buy": "Achat ≥ 500 € (max 10/jour)",
   "xp.list.sell": "Vente avec bénéfice (max 5/jour)",
   "xp.list.own": "Acquérir une entreprise (1× chacune)",
@@ -609,7 +607,7 @@ I18N.add("fr", {
   "conn.badUrl": "Adresse de serveur invalide.",
   "conn.elsewhere": "Cette partie a été ouverte dans un autre onglet ou appareil.",
   "conn.lost": "Connexion perdue. Reconnexion…",
-  "conn.retry": "Pas de connexion. Nouvel essai dans {n} s… (les serveurs gratuits peuvent mettre jusqu'à une minute à démarrer)",
+  "conn.retry": "Pas de connexion. Nouvel essai dans {n} s… (les serveurs gratuits peuvent mettre jusqu'à une minute à démarrer)"
 });
 
 // Jobs, mini-games, side hustles, loan, rival attack styles
@@ -765,7 +763,6 @@ I18N.add("fr", {
   "tut.owner.title": "Tu es propriétaire ! 🏢",
   "tut.owner.text": "Ouvre l'onglet Entreprises pour diriger {company}.",
   "tut.dividend.title": "Paie-toi",
-  "tut.dividend.text": "Le dividende est la part du bénéfice quotidien de l'entreprise qui te revient. Appuie sur 50 %.",
   "tut.factory.title": "Fais-la grandir 🏭",
   "tut.factory.text": "L'entreprise a sa propre trésorerie, séparée de ton argent. Utilise-la : construis une usine ({cost}). Plus de revenus pour l'entreprise, c'est plus de dividendes pour toi.",
   "tut.payday.title": "Encaisse tes revenus",
@@ -800,13 +797,11 @@ I18N.add("fr", {
   "xp.reason.step": "premier pas réussi",
   "glossary.title": "Qu'est-ce que ça veut dire ?",
   "glossary.share": "Action",
-  "glossary.share.text": "Une petite part d'une entreprise. Son cours change chaque jour.",
   "glossary.profit": "Bénéfice et perte",
   "glossary.profit.text": "La différence entre ce que tu as payé et ce que valent tes actions maintenant. Elle ne devient réelle que quand tu vends.",
   "glossary.owner": "Propriétaire et PDG",
   "glossary.owner.text": "Avec {n} actions (et plus que tout rival), l'entreprise est à toi et tu décides ce qu'elle fait. Avec {ceo} actions, tu en es le PDG.",
   "glossary.dividend": "Dividende",
-  "glossary.dividend.text": "La part du bénéfice quotidien d'une entreprise qui t'est versée en tant que propriétaire. Tu choisis le pourcentage.",
   "glossary.companyCash": "Trésorerie de l'entreprise",
   "glossary.companyCash.text": "L'argent de l'entreprise, pas le tien. Les actions comme les usines et le marketing sont payées avec.",
   "glossary.salary": "Salaire et heures sup",
@@ -823,4 +818,26 @@ I18N.add("fr", {
   "online.tax.none": "Aucun",
   "online.tax.normal": "25 %",
   "online.tax.high": "40 %"
+});
+
+// Shares, value-based prices, AI bosses
+I18N.add("fr", {
+  "news.aiFactory": "{company} construit une nouvelle usine.",
+  "news.aiBuyback": "{company} rachète {n} de ses propres actions.",
+  "news.takeoverPayout": "{company} verse {amount} de sa trésorerie aux autres actionnaires après ta prise de contrôle.",
+  "news.takeoverPayoutAll": "{company} verse {amount} de sa trésorerie aux autres actionnaires après la prise de contrôle.",
+  "news.relaunch": "{company} revient sur le marché avec de nouveaux propriétaires.",
+  "err.noShares": "Il ne reste que {n} actions de {company} à vendre.",
+  "stock.info": "{n} actions • dividende {pct} %",
+  "stock.stake": "tu possèdes {pct} %",
+  "company.stake": "Tu détiens {qty} des {n} actions ({pct} %). Les dividendes sont versés par action.",
+  "autopilot.on": "Pilote automatique activé",
+  "autopilot.off": "Pilote automatique désactivé",
+  "autopilot.help": "En pilote automatique, le patron IA dirige cette entreprise pour toi : il investit la trésorerie et fixe le dividende.",
+  "company.dividendText": "Chaque jour, {pct} % du bénéfice est versé aux actionnaires, par action. Tu reçois la part qui correspond à tes actions. Le reste reste dans l'entreprise.",
+  "investor.dividendText": "Chaque entreprise fait un bénéfice ou une perte chaque jour. Le <b>dividende</b> est la part du bénéfice versée aux actionnaires, par action : plus tu as d'actions, plus tu reçois. Le reste reste dans l'entreprise. Les pertes réduisent la trésorerie ; en dessous de {amount}, l'entreprise fait faillite.",
+  "tut.dividend.text": "Le dividende est la part du bénéfice quotidien qu'une entreprise verse à ses actionnaires, par action. En tant que propriétaire, tu choisis combien. Appuie sur 50 %.",
+  "glossary.dividend.text": "La part du bénéfice quotidien d'une entreprise versée à ses actionnaires, par action. Plus d'actions, c'est une plus grande part. Le propriétaire choisit le pourcentage.",
+  "glossary.share.text": "Une petite part d'une entreprise. Son cours suit ce que vaut l'entreprise : sa trésorerie et son bénéfice.",
+  "tip.shares": "Le cours d'une action suit ce que vaut l'entreprise : sa trésorerie et son bénéfice. Chaque entreprise a un patron IA qui investit, lance des produits et attaque ses concurrents. Suis les nouvelles pour voir qui grandit."
 });

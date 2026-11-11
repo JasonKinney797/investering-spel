@@ -78,6 +78,7 @@ const PERSONAL_LOAN = 1000;
 const PERSONAL_LOAN_RATE = 0.015;         // per day
 const BANKRUPT_LIMIT = -2500;             // net worth below this = game over
 const EUROBANK_BASE = 60;
+const RELAUNCH_DAYS = 25;
 // Taxes per difficulty. Income tax (salary, side hustles, mini-game bonuses) works in daily bands; dividends have a flat rate.
 const TAXES = {
   easy: null,
@@ -192,6 +193,7 @@ function makeStock(def) {
     recession: def.recession || 0.978,
     dividendRate: 10, playerCEO: false, ceo: { ...def.ceo }, products: [],
     bankrupt: false, history: [def.price], controlledBy: null, custom: !!def.custom, lastWarDay: 0,
+    shares: D.sharesFor(def, def.employees * 2), profitAvg: def.employees * 2, autopilot: false, bankruptDay: 0,
   };
 }
 
@@ -270,7 +272,17 @@ function migrate(s) {
     ex.recession = def.recession;
     if (!ex.sector) ex.sector = def.sector;
   });
-  s.stocks.forEach(x => { if (!x.recession) x.recession = 0.978; });
+  s.stocks.forEach(x => {
+    if (!x.recession) x.recession = 0.978;
+    if (!x.shares) {
+      // Older saves: give the company shares so that today's price is its fair value.
+      x.profitAvg = x.employees * 2 + D.factoryIncome(x.factories || 0);
+      const held = (s.holdings[x.name] ? s.holdings[x.name].qty : 0) + (s.rivals || []).reduce((tt, r) => tt + (r.holdings && r.holdings[x.name] ? r.holdings[x.name].qty : 0), 0);
+      const value = Math.max(0, x.companyCash) - (x.debt || 0) + x.profitAvg * D.VALUE_DAYS;
+      x.shares = Math.max(200, held + 50, Math.round(value / Math.max(1, x.price) / 50) * 50);
+      x.autopilot = false; x.bankruptDay = s.day;
+    }
+  });
   s.alerts = s.alerts || [];
   if (!s.career) s.career = { level: 1, xp: 0, since: 0 };
   if (s.job === undefined) s.job = null;
@@ -384,7 +396,7 @@ function synergyBonus(name, key) {
 
 const econMult = () => (state.depression ? 0.6 : state.recession ? 0.78 : 1);
 function calcIncome(s) {
-  const base = s.employees * 4 + s.factories * FACTORY_DAILY_INCOME;
+  const base = s.employees * 4 + D.factoryIncome(s.factories);
   const market = 1 + s.markets.reduce((tt, m) => tt + MARKET_INCOME_BONUS[m], 0);
   return base * market * (1 + synergyBonus(s.name, "income")) * econMult();
 }
@@ -470,7 +482,7 @@ function checkMilestones(total) {
 function estimatedDividend() {
   return ownedNames().reduce((tt, n) => {
     const s = stockBy(n); const p = calcProfit(s);
-    return tt + (p > 0 ? p * s.dividendRate / 100 : 0);
+    return tt + (p > 0 ? p * s.dividendRate / 100 * qtyOf(n) / s.shares * (1 - dividendTaxRate()) : 0);
   }, 0);
 }
 function newGoal() {
@@ -525,6 +537,14 @@ function syncOwnership(silent = false) {
         delete state.lostTo[name];
       } else {
         addNews([["news.control", { company: name }]], "good");
+        // Part of the company's cash is paid out to the other shareholders, so a takeover is not a jackpot.
+        if (!s.custom && !s.paidOut && s.companyCash > 20000) {
+          s.paidOut = true;                   // once per company, so control cannot be flipped for repeated payouts
+          const payout = round2(s.companyCash * D.TAKEOVER_PAYOUT);
+          s.companyCash = round2(s.companyCash - payout);
+          payShareholders(s, payout);         // the other shareholders are paid; the new owner is not
+          addNews([["news.takeoverPayout", { company: name, amount: payout }]]);
+        }
       }
       if (!state.rewarded.own[name]) { state.rewarded.own[name] = true; awardXP(XP_REWARDS.own_company, "xp.reason.own"); }
       unlock("first_own");
@@ -571,7 +591,7 @@ const ceoName = s => (s.ceo.isPlayer || s.playerCEO ? t("you") : s.ceo.name);
 // ═══════════════════════════════════════════════════════════════════════════
 
 function goBankrupt(s, notes) {
-  s.bankrupt = true; s.price = 0; s.employees = 0; s.companyCash = 0; s.debt = 0;
+  s.bankrupt = true; s.price = 0; s.employees = 0; s.companyCash = 0; s.debt = 0; s.bankruptDay = state.day; s.autopilot = false;
   s.playerCEO = false; s.controlledBy = null;
   notes.push(["news.bankrupt", { company: s.name }]);
   state.rivals.forEach(r => { delete r.holdings[s.name]; });
@@ -587,10 +607,30 @@ function goBankrupt(s, notes) {
   if (qtyOf(s.name) > 0 || state.ownedPrev[s.name]) unlock("bankruptcy");
 }
 
-function aiManage(s) {
-  if (s.companyCash > 150000 && Math.random() < 0.03) { s.companyCash -= FACTORY_COST; s.factories++; s.employees += 120; }
-  else if (s.companyCash > 60000 && Math.random() < 0.04) { s.companyCash -= 20000; s.research = clamp(s.research + 5, 0, 100); }
-  else if (s.companyCash > 30000 && s.reputation < 45 && Math.random() < 0.05) { s.companyCash -= 5000; s.reputation = clamp(s.reputation + 6, 0, 100); }
+// Shares of a company held by you and the rivals together, and how many are still for sale.
+const heldShares = s => qtyOf(s.name) + state.rivals.reduce((tt, r) => tt + (r.holdings[s.name] ? r.holdings[s.name].qty : 0), 0);
+const freeShares = s => Math.max(0, s.shares - heldShares(s));
+const stakePct = s => qtyOf(s.name) / s.shares * 100;
+// Pay an amount to all shares of a company. The part of shares nobody in the game holds goes to the public.
+function payShareholders(s, pool) {
+  if (pool <= 0) return 0;
+  state.rivals.forEach(r => { const h = r.holdings[s.name]; if (h) r.cash = round2(r.cash + pool * h.qty / s.shares); });
+  return pool * qtyOf(s.name) / s.shares;
+}
+function bossContext(s) {
+  return { mode: state.difficulty, crisis: inCrisis(), day: state.day, others: state.stocks.filter(o => o !== s && !o.bankrupt), held: heldShares,
+    mult: x => (1 + x.markets.reduce((tt, m) => tt + MARKET_INCOME_BONUS[m], 0)) * econMult(),
+    markets: MARKETS, marketBonus: MARKET_INCOME_BONUS, marketFail: MARKET_FAIL_CHANCE,
+    costs: { marketing: ACTION_COSTS.marketing, employees: ACTION_COSTS.employees, research: ACTION_COSTS.research, product: ACTION_COSTS.product, war: WAR_COSTS, markets: MARKET_COSTS, loan: LOAN_AMOUNT, maxDebt: MAX_DEBT } };
+}
+// A bankrupt company comes back a while later, smaller and under new owners.
+function relaunch(s, notes) {
+  const def = D.STOCK_DEFS.find(d => d.name === s.name);
+  if (!def) return;
+  delete state.holdings[s.name]; delete state.ownedPrev[s.name]; delete state.qtyPrev[s.name]; delete state.lostTo[s.name];
+  Object.assign(s, makeStock({ ...def, employees: Math.round(def.employees * 0.5), companyCash: Math.round(def.companyCash * 0.5), ceo: randomCeo() }));
+  s.price = round2(D.fairValue(s)); s.history = [s.price];
+  notes.push(["news.relaunch", { company: s.name }]);
 }
 
 function advanceDay() {
@@ -605,16 +645,21 @@ function advanceDay() {
   const hardcoreNoDiv = state.difficulty === "hardcore" && inCrisis();   // Hardcore: no dividends during a crisis
 
   state.stocks.forEach(s => {
-    if (s.bankrupt) return;
+    if (s.bankrupt) { if (!s.custom && state.day - (s.bankruptDay || 0) >= RELAUNCH_DAYS) relaunch(s, notes); return; }
     const profit = calcProfit(s);
-    if (owned.has(s.name) && profit > 0) {
-      const div = hardcoreNoDiv ? 0 : profit * s.dividendRate / 100;
-      dividend += div;
-      s.companyCash += profit - div;
-    } else s.companyCash += profit;
-    if (!owned.has(s.name)) aiManage(s);
+    s.profitAvg = s.profitAvg * 0.85 + profit * 0.15;
+    // Dividends are paid per share, to everyone who holds shares.
+    const pool = profit > 0 && !hardcoreNoDiv ? profit * s.dividendRate / 100 : 0;
+    dividend += payShareholders(s, pool);
+    s.companyCash += profit - pool;
+    // The AI boss runs every company you don't control (and yours too, on autopilot).
+    if (!tut && (!owned.has(s.name) || s.autopilot)) {
+      const mine = n => qtyOf(n) > 0;
+      D.aiBoss(s, bossContext(s)).forEach(part => { if (mine(s.name) || (part[2] && mine(part[2]))) notes.push([part[0], part[1]]); });
+    }
     s.companyCash = round2(s.companyCash);
 
+    const fair = D.fairValue(s);
     let p = s.price;
     if (ev.affected === "*" || ev.affected.includes(s.name)) p *= mult;
     if (s.name === "EuroBank") p *= Math.random() > 0.5 ? 1.002 : 0.998;
@@ -630,19 +675,14 @@ function advanceDay() {
       // A bank is calm in normal times and falls hard in a crisis.
       if (state.recession && Math.random() < 0.10) { p *= 0.75; notes.push(["news.bankRun", {}]); }
       if (state.depression) p *= 0.97;
-      if (!inCrisis()) {
-        if (state.ebPeak) {
-          // Hardcore: a strong rebound to just above the old level, easing into the usual calm growth.
-          const target = state.ebPeak * 1.03;
-          p += (target - p) * 0.18;
-          if (p >= target * 0.98) state.ebPeak = 0;
-        } else if (p < EUROBANK_BASE) p += (EUROBANK_BASE - p) * 0.04;      // climbs back afterwards
-      }
+      // After a crisis the bank climbs back to its real value quickly (fastest on Hardcore).
+      if (!inCrisis() && p < fair) p += (fair - p) * (state.difficulty === "hardcore" ? 0.14 : 0.06);
       p = Math.max(p, EUROBANK_BASE * 0.1);                                 // too big to fail completely
     }
+    p += (fair - p) * D.FAIR_PULL;                                           // the price follows what the company is worth
     if (s.name === "SpaceY") {
-      if (p > 1200 && Math.random() < 0.18) { p *= 0.55; s.reputation = clamp(s.reputation - 8, 0, 100); notes.push(["news.bubble", {}]); }
-      if (p > 4000 && Math.random() < 0.30) { p *= 0.30; s.reputation = clamp(s.reputation - 15, 0, 100); notes.push(["news.megaBubble", {}]); }
+      if (p > fair * 2.5 && Math.random() < 0.18) { p *= 0.55; s.reputation = clamp(s.reputation - 8, 0, 100); notes.push(["news.bubble", {}]); }
+      if (p > fair * 5 && Math.random() < 0.30) { p *= 0.30; s.reputation = clamp(s.reputation - 15, 0, 100); notes.push(["news.megaBubble", {}]); }
     }
     if (!tut && Math.random() < 0.008 * ((100 - s.ceo.reliability) / 100)) {
       s.reputation = clamp(s.reputation - 8, 0, 100); p *= 0.92;
@@ -681,6 +721,7 @@ function advanceDay() {
   dailyWork(notes, tut);
   if (!tut) rivalsAct(notes);
   if (notes.some(n => /^news\.rival(Buys|Short|Snipes)$/.test(n[0]))) tip("rival");
+  if (!tut) tip("shares");
 
   // Economic cycle
   const roll = Math.random();
@@ -793,6 +834,7 @@ function rivalWorth(r) {
   return r.cash + Object.keys(r.holdings).reduce((tt, n) => { const s = stockBy(n); return tt + (s ? r.holdings[n].qty * s.price : 0); }, 0);
 }
 function rivalBuy(r, s, qty) {
+  qty = Math.min(qty, freeShares(s));
   if (qty < 1) return 0;
   const cost = qty * s.price * (1 + diff().fee);
   if (cost > r.cash) return 0;
@@ -985,7 +1027,7 @@ function readAmount(name) {
 }
 function maxBuyable(s) {
   if (s.bankrupt || s.price <= 0) return 0;
-  return Math.max(0, Math.floor(state.cash / (s.price * (1 + feeRate()))));
+  return Math.max(0, Math.min(freeShares(s), Math.floor(state.cash / (s.price * (1 + feeRate())))));
 }
 
 function buyStock(name) {
@@ -993,6 +1035,7 @@ function buyStock(name) {
   if (!s || s.bankrupt) return;
   const qty = readAmount(name);
   if (!qty) return msg(t("err.amount"));
+  if (qty > freeShares(s)) return msg(t("err.noShares", { n: freeShares(s), company: name }));
   // Employee perk: 10% off the first few shares of your employer each day.
   const empQty = state.job && state.job.company === name && state.job.startsIn === 0 ? Math.max(0, Math.min(qty, EMPLOYEE_DISCOUNT_SHARES - state.today.emp)) : 0;
   const cost = s.price * qty - s.price * empQty * EMPLOYEE_DISCOUNT, fee = cost * feeRate();
@@ -1132,15 +1175,17 @@ function companyAction(action, arg) {
       addNews([["news.newCeo", { company: s.name, ceo: c.name }]]);
       break;
     }
+    case "autopilot": s.autopilot = !s.autopilot; done = false; save(); render(); return;
     case "selfceo":
       if (qtyOf(s.name) < CEO_THRESHOLD) return msg(t("err.needCeo", { n: CEO_THRESHOLD }));
       if (s.playerCEO) return;
       becomeCEO(s); done = true;
       break;
     case "factory":
-      if ((done = spend(s, ACTION_COSTS.factory))) {
+      if ((done = spend(s, D.factoryCost(s.factories)))) {
+        const income = D.factoryUnit(s.factories);
         s.factories++; s.employees += 120; s.price = round2(s.price * 1.05); ceoDelta(s, { leadership: 1, reliability: 1 });
-        addNews([["news.factory", { company: s.name, income: FACTORY_DAILY_INCOME }]], "good");
+        addNews([["news.factory", { company: s.name, income }]], "good");
       }
       break;
     case "product": {
@@ -1430,7 +1475,7 @@ const TUTORIAL_STEPS = [
 function tutParams() {
   const h = state.holdings[TUT_TRADE], tr = stockBy(TUT_TRADE);
   return { company: TUT, trade: TUT_TRADE, n: OWNERSHIP_THRESHOLD, qty: TUT_TRADE_QTY,
-    gain: fmtShort(h ? (tr.price - h.avg) * h.qty : 0), cost: fmtShort(FACTORY_COST) };
+    gain: fmtShort(h ? (tr.price - h.avg) * h.qty : 0), cost: fmtShort(D.factoryCost(stockBy(TUT).factories)) };
 }
 function tutorialStep() { return ui.tutorial ? TUTORIAL_STEPS[ui.tutorial.step] : null; }
 function tutorialTick() {
@@ -1577,6 +1622,7 @@ function renderMarket() {
         <div class="stock-id">
           <button class="linkish" data-act="chart" data-arg="${esc(s.name)}" title="${esc(t("chart.big"))}">${esc(s.name)} <span aria-hidden="true">🔍</span></button>
           <div class="sub">${s.bankrupt ? `💀 ${t("bankrupt")}` : `${companyLevel(s)} • ${sectorName(s.sector)} • ${s.markets.map(marketName).join(", ")}`}</div>
+          ${s.bankrupt ? "" : `<div class="sub">${t("stock.info", { n: I18N.num(s.shares), pct: s.dividendRate })}${q ? ` • ${t("stock.stake", { pct: I18N.num(stakePct(s), stakePct(s) < 10 ? 1 : 0) })}` : ""}</div>`}
           <div class="badges">
             ${owned ? badge(t("badge.owned")) : ""}${s.playerCEO ? badge("CEO", "#f59e0b") : ""}
             ${s.controlledBy ? badge(t("badge.via", { company: esc(s.controlledBy) }), "#6366f1") : ""}
@@ -1677,7 +1723,7 @@ function renderCompany() {
       </div>
       <div class="kpis">
         ${[[k("kpi.income"), fmtShort(calcIncome(s))], [k("kpi.costs"), fmtShort(calcCosts(s))], [k("kpi.profit"), fmtShort(profit), profit >= 0 ? "#22c55e" : "#ef4444"],
-           [k("kpi.dividend"), fmtShort(Math.max(0, profit * s.dividendRate / 100)), "#a78bfa"]]
+           [k("kpi.dividend"), fmtShort(Math.max(0, profit * s.dividendRate / 100) * qtyOf(s.name) / s.shares), "#a78bfa"]]
           .map(([l, v, c]) => `<div class="kpi"><span>${l}</span><strong style="color:${c || "#e2e8f0"}">${v}</strong></div>`).join("")}
       </div>
     </div>
@@ -1689,6 +1735,9 @@ function renderCompany() {
         ${s.products.length ? s.products.slice(-6).map(p => `<div class="row-between small-t mb3"><span>${esc(p.name)}</span>${badge(k(`product.${p.result}`), p.result === "Hit" ? "#22c55e" : "#ef4444")}</div>`).join("") : `<div class="muted">${k("company.noProducts")}</div>`}
         ${syn.length ? `<span class="label mt8">${k("company.synergies")}</span>${syn.map(sy => `<div class="small-t" style="color:#22c55e">🔗 ${k(`syn.${sy.id}.label`)}</div>`).join("")}` : ""}</div>
     </div>
+    <div class="section"><div class="row-between"><span class="muted small-t">${k("company.stake", { pct: I18N.num(stakePct(s), 1), qty: I18N.num(qtyOf(s.name)), n: I18N.num(s.shares) })}</span>
+      ${btn(`🤖 ${k(s.autopilot ? "autopilot.on" : "autopilot.off")}`, "c:autopilot", { color: s.autopilot ? "#22c55e" : "#64748b", cls: "small", title: k("autopilot.help") })}</div>
+      ${s.autopilot ? `<div class="muted small-t mt4">${k("autopilot.help")}</div>` : ""}</div>
     <div class="section" id="dividend-row"><span class="label">${k("company.dividendTitle", { pct: s.dividendRate })}</span>
       <div class="muted mb6">${k("company.dividendText", { pct: s.dividendRate })}</div>
       <div class="btn-row">${[0, 10, 25, 50, 75].map(r => btn(`${r}%`, "c:dividend", { arg: r, color: s.dividendRate === r ? "#a78bfa" : "#64748b", cls: s.dividendRate === r ? "active" : "" })).join("")}</div>
@@ -1700,7 +1749,7 @@ function renderCompany() {
         ${btn(k("act.research", { cost: fmtShort(20000) }), "c:research", { color: "#a78bfa" })}
         ${btn(k("act.risk", { cost: fmtShort(30000) }), "c:risk", { color: "#ef4444", disabled: !s.custom && !D.RISK_PROFILES[s.name] })}
         ${btn(k("act.product", { cost: fmtShort(25000) }), "c:product", { color: "#ec4899" })}
-        ${btn(k("act.factory", { cost: fmtShort(50000) }), "c:factory", { color: "#f97316" })}
+        ${btn(k("act.factory", { cost: fmtShort(D.factoryCost(s.factories)) }), "c:factory", { color: "#f97316" })}
         ${btn(k("act.ceo", { cost: fmtShort(15000) }), "c:ceo", { color: "#94a3b8" })}
         ${btn(k("act.selfceo"), "c:selfceo", { color: "#f59e0b", disabled: s.playerCEO || q < CEO_THRESHOLD, title: q < CEO_THRESHOLD ? k("err.needCeo", { n: CEO_THRESHOLD }) : "" })}
         ${btn(`${k("act.loan", { amount: fmtShort(LOAN_AMOUNT) })}${s.debt ? ` (${loanCount(s)}/${MAX_LOANS})` : ""}`, "c:loan", { color: "#06b6d4", disabled: s.debt + LOAN_AMOUNT > MAX_DEBT })}

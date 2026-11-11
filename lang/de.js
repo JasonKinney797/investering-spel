@@ -162,7 +162,6 @@ I18N.add("de", {
   "company.noProducts": "Noch keine Produkte.",
   "company.synergies": "Aktive Synergien",
   "company.dividendTitle": "Dividendenpolitik — aktuell {pct}%",
-  "company.dividendText": "Jeden Tag gehen {pct}% des Gewinns an dein Bargeld. Der Rest bleibt in der Firma.",
   "company.actions": "Firmenaktionen",
   "company.interest": "Zinsen: {pct}%/Tag (abhängig von der Zuverlässigkeit des CEO).",
   "company.inject": "Geld einlegen (dein Bargeld → Firma)",
@@ -232,7 +231,6 @@ I18N.add("de", {
   "investor.earn": "XP verdienen",
   "investor.synergies": "Branchensynergien",
   "investor.dividendTitle": "Dividende erklärt",
-  "investor.dividendText": "Eine Firma, die dir gehört, macht jeden Tag Gewinn oder Verlust. Die <b>Dividende</b> ist der Teil des Gewinns, der an dein Bargeld geht. Der Rest bleibt in der Firma. Verluste senken die Firmenkasse; unter {amount} geht die Firma pleite.",
   "xp.list.buy": "Kauf ≥ 500 € (max. 10/Tag)",
   "xp.list.sell": "Verkauf mit Gewinn (max. 5/Tag)",
   "xp.list.own": "Firma erwerben (je 1×)",
@@ -609,7 +607,7 @@ I18N.add("de", {
   "conn.badUrl": "Ungültige Serveradresse.",
   "conn.elsewhere": "Dieses Spiel wurde in einem anderen Tab oder Gerät geöffnet.",
   "conn.lost": "Verbindung verloren. Neu verbinden…",
-  "conn.retry": "Keine Verbindung. Neuer Versuch in {n} s… (kostenlose Server brauchen bis zu einer Minute zum Aufwachen)",
+  "conn.retry": "Keine Verbindung. Neuer Versuch in {n} s… (kostenlose Server brauchen bis zu einer Minute zum Aufwachen)"
 });
 
 // Jobs, mini-games, side hustles, loan, rival attack styles
@@ -765,7 +763,6 @@ I18N.add("de", {
   "tut.owner.title": "Du bist Eigentümer! 🏢",
   "tut.owner.text": "Öffne den Tab Firmen, um {company} zu führen.",
   "tut.dividend.title": "Zahl dich selbst aus",
-  "tut.dividend.text": "Die Dividende ist der Teil des täglichen Firmengewinns, der an dich geht. Drücke auf 50 %.",
   "tut.factory.title": "Lass sie wachsen 🏭",
   "tut.factory.text": "Die Firma hat ihre eigene Kasse, getrennt von deinem Geld. Nutze sie: Baue eine Fabrik ({cost}). Mehr Einnahmen für die Firma bedeuten mehr Dividende für dich.",
   "tut.payday.title": "Hol dir dein Einkommen",
@@ -800,13 +797,11 @@ I18N.add("de", {
   "xp.reason.step": "erster Schritt geschafft",
   "glossary.title": "Was bedeutet das?",
   "glossary.share": "Aktie",
-  "glossary.share.text": "Ein kleiner Teil einer Firma. Ihr Kurs ändert sich jeden Tag.",
   "glossary.profit": "Gewinn und Verlust",
   "glossary.profit.text": "Der Unterschied zwischen dem, was du bezahlt hast, und dem heutigen Wert deiner Aktien. Echt wird er erst beim Verkauf.",
   "glossary.owner": "Eigentümer und CEO",
   "glossary.owner.text": "Mit {n} Aktien (und mehr als jeder Rivale) gehört dir die Firma und du entscheidest, was sie tut. Mit {ceo} Aktien bist du ihr CEO.",
   "glossary.dividend": "Dividende",
-  "glossary.dividend.text": "Der Teil des täglichen Firmengewinns, der an dich als Eigentümer ausgezahlt wird. Du wählst den Prozentsatz.",
   "glossary.companyCash": "Firmenkasse",
   "glossary.companyCash.text": "Geld, das der Firma gehört, nicht dir. Aktionen wie Fabriken und Marketing werden daraus bezahlt.",
   "glossary.salary": "Gehalt und Überstunden",
@@ -823,4 +818,26 @@ I18N.add("de", {
   "online.tax.none": "Keine",
   "online.tax.normal": "25 %",
   "online.tax.high": "40 %"
+});
+
+// Shares, value-based prices, AI bosses
+I18N.add("de", {
+  "news.aiFactory": "{company} baut eine neue Fabrik.",
+  "news.aiBuyback": "{company} kauft {n} eigene Aktien zurück.",
+  "news.takeoverPayout": "{company} zahlt nach deiner Übernahme {amount} aus der Firmenkasse an die anderen Aktionäre.",
+  "news.takeoverPayoutAll": "{company} zahlt nach der Übernahme {amount} aus der Firmenkasse an die anderen Aktionäre.",
+  "news.relaunch": "{company} ist mit neuen Eigentümern zurück am Markt.",
+  "err.noShares": "Von {company} sind nur noch {n} Aktien zu kaufen.",
+  "stock.info": "{n} Aktien • Dividende {pct} %",
+  "stock.stake": "dir gehören {pct} %",
+  "company.stake": "Du hältst {qty} von {n} Aktien ({pct} %). Dividenden werden pro Aktie gezahlt.",
+  "autopilot.on": "Autopilot an",
+  "autopilot.off": "Autopilot aus",
+  "autopilot.help": "Mit Autopilot führt der KI-Chef diese Firma für dich: Er investiert die Firmenkasse und legt die Dividende fest.",
+  "company.dividendText": "Jeden Tag gehen {pct} % des Gewinns an die Aktionäre, pro Aktie. Du bekommst den Teil, der zu deinen Aktien gehört. Der Rest bleibt in der Firma.",
+  "investor.dividendText": "Jede Firma macht jeden Tag Gewinn oder Verlust. Die <b>Dividende</b> ist der Teil des Gewinns, der an die Aktionäre geht, pro Aktie: Je mehr Aktien du hältst, desto mehr bekommst du. Der Rest bleibt in der Firma. Verluste verringern die Firmenkasse; unter {amount} geht die Firma bankrott.",
+  "tut.dividend.text": "Die Dividende ist der Teil des täglichen Gewinns, den eine Firma an ihre Aktionäre zahlt, pro Aktie. Als Eigentümer bestimmst du, wie viel. Drücke auf 50 %.",
+  "glossary.dividend.text": "Der Teil des täglichen Firmengewinns, der an die Aktionäre gezahlt wird, pro Aktie. Mehr Aktien bedeuten einen größeren Teil. Der Eigentümer wählt den Prozentsatz.",
+  "glossary.share.text": "Ein kleiner Teil einer Firma. Ihr Kurs folgt dem, was die Firma wert ist: ihrer Kasse und ihrem Gewinn.",
+  "tip.shares": "Der Kurs einer Aktie folgt dem, was die Firma wert ist: ihrer Kasse und ihrem Gewinn. Jede Firma hat einen KI-Chef, der investiert, Produkte herausbringt und Konkurrenten angreift. Verfolge die Nachrichten, um zu sehen, wer wächst."
 });

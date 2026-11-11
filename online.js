@@ -357,6 +357,7 @@ function renderMarket() {
       <div class="stock-top">
         <div class="stock-id"><strong>${esc(s.name)}</strong>
           <div class="sub">${s.bankrupt ? `💀 ${t("bankrupt")}` : `${t(`sector.${s.sector}`)} • ${esc(s.markets.map(marketName).join(", "))}`}</div>
+          ${s.bankrupt || !s.shares ? "" : `<div class="sub">${t("stock.info", { n: I18N.num(s.shares), pct: s.dividendRate })}</div>`}
           <div class="badges">${owner ? badge(mine ? t("online.yourCompany") : `👑 ${esc(owner.name)}`, owner.color) : badge(t("online.free"), "#64748b")}${sh ? badge(`${t("short")} ${sh.qty}`, "#ec4899") : ""}</div>
         </div>
         <div class="stock-price"><div class="price">€${fmt(s.price)}</div>
@@ -413,7 +414,7 @@ function renderCompany() {
         ${btn(t("act.research", { cost: fmtShort(20000) }), "co", c({ arg: "research", color: "#a78bfa" }))}
         ${btn(t("act.risk", { cost: fmtShort(30000) }), "co", c({ arg: "risk", color: "#ef4444", disabled: !s.hasRisk }))}
         ${btn(t("act.product", { cost: fmtShort(25000) }), "co", c({ arg: "product", color: "#ec4899" }))}
-        ${btn(t("act.factory", { cost: fmtShort(50000) }), "co", c({ arg: "factory", color: "#f97316" }))}
+        ${btn(t("act.factory", { cost: fmtShort(s.factoryCost || 50000) }), "co", c({ arg: "factory", color: "#f97316" }))}
         ${btn(t("act.ceo", { cost: fmtShort(15000) }), "co", c({ arg: "ceo", color: "#94a3b8", disabled: !!s.ceoId }))}
         ${btn(t("act.loan", { amount: fmtShort(100000) }), "co", c({ arg: "loan", color: "#06b6d4", disabled: s.debt + 100000 > 500000 }))}
         ${btn(t("act.repay", { amount: fmtShort(50000) }), "co", c({ arg: "repay", color: "#14b8a6", disabled: s.debt <= 0 }))}
